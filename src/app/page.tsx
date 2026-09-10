@@ -2,6 +2,7 @@ import { SelectionProvider } from "@/context/SelectionContext";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import Sobre from "@/components/Sobre";
+import ProvaSocial from "@/components/ProvaSocial";
 import Planos from "@/components/Planos";
 import Assinatura from "@/components/Assinatura";
 import Avulsos from "@/components/Avulsos";
@@ -16,6 +17,7 @@ export default function Home() {
       <main className="flex-1">
         <Hero />
         <Sobre />
+        <ProvaSocial />
         <Planos />
         <Assinatura />
         <Avulsos />

@@ -8,7 +8,7 @@ export default function Planos() {
   const { selecionarPlano } = useSelection();
 
   return (
-    <section id="planos" className="px-6 py-20">
+    <section id="planos" className="bg-surface px-6 py-20">
       <div className="mx-auto max-w-6xl">
         <div className="mb-12 text-center">
           <p className="mb-3 font-mono text-sm uppercase tracking-widest text-cyan">Planos</p>

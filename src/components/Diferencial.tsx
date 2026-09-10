@@ -2,7 +2,7 @@ import { diferenciais } from "@/lib/data";
 
 export default function Diferencial() {
   return (
-    <section id="diferencial" className="px-6 py-20">
+    <section id="diferencial" className="bg-surface px-6 py-20">
       <div className="mx-auto max-w-4xl">
         <div className="mb-10 text-center">
           <p className="mb-3 font-mono text-sm uppercase tracking-widest text-cyan">Diferencial</p>

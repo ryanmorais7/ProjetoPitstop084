@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { planos } from "@/lib/data";
-import { formatarPreco } from "@/lib/format";
+import { useEffect, useMemo, useState } from "react";
+import { planos, PlanoId } from "@/lib/data";
+import { formatarPreco, formatarTelefone } from "@/lib/format";
 import { useSelection } from "@/context/SelectionContext";
 import FakeQrCode from "./FakeQrCode";
 
@@ -11,7 +11,8 @@ type Etapa = "dados" | "pagamento" | "confirmacao";
 interface DadosCadastro {
   nome: string;
   telefone: string;
-  veiculo: string;
+  veiculoModelo: string;
+  veiculoPlaca: string;
   dataNascimento: string;
   endereco: string;
 }
@@ -19,10 +20,13 @@ interface DadosCadastro {
 const dadosVazios: DadosCadastro = {
   nome: "",
   telefone: "",
-  veiculo: "",
+  veiculoModelo: "",
+  veiculoPlaca: "",
   dataNascimento: "",
   endereco: "",
 };
+
+const CHAVE_STORAGE = "pitstop084:assinatura-dados";
 
 const etapas: { id: Etapa; label: string }[] = [
   { id: "dados", label: "Dados" },
@@ -30,12 +34,47 @@ const etapas: { id: Etapa; label: string }[] = [
   { id: "confirmacao", label: "Confirmação" },
 ];
 
+function planoDaUrl(): PlanoId | null {
+  const idsValidos = planos.map((p) => p.id);
+  const daQuery = new URLSearchParams(window.location.search).get("plano");
+  if (daQuery && idsValidos.includes(daQuery as PlanoId)) return daQuery as PlanoId;
+
+  const [, querystringDoHash] = window.location.hash.split("?");
+  if (querystringDoHash) {
+    const doHash = new URLSearchParams(querystringDoHash).get("plano");
+    if (doHash && idsValidos.includes(doHash as PlanoId)) return doHash as PlanoId;
+  }
+  return null;
+}
+
 export default function Assinatura() {
   const { planoSelecionado, selecionarPlano } = useSelection();
   const [etapa, setEtapa] = useState<Etapa>("dados");
   const [dados, setDados] = useState<DadosCadastro>(dadosVazios);
   const [processandoPagamento, setProcessandoPagamento] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    const planoUrl = planoDaUrl();
+    if (planoUrl) selecionarPlano(planoUrl);
+
+    try {
+      const salvo = localStorage.getItem(CHAVE_STORAGE);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- carrega rascunho salvo uma única vez, na montagem
+      if (salvo) setDados(JSON.parse(salvo));
+    } catch {
+      // localStorage indisponível ou dado corrompido, segue com o formulário vazio
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAVE_STORAGE, JSON.stringify(dados));
+    } catch {
+      // localStorage indisponível, segue sem persistir
+    }
+  }, [dados]);
 
   const plano = useMemo(
     () => planos.find((p) => p.id === planoSelecionado) ?? planos[0],
@@ -45,7 +84,8 @@ export default function Assinatura() {
   const dadosValidos =
     dados.nome.trim().length > 1 &&
     dados.telefone.trim().length > 7 &&
-    dados.veiculo.trim().length > 1 &&
+    dados.veiculoModelo.trim().length > 1 &&
+    dados.veiculoPlaca.trim().length > 3 &&
     dados.dataNascimento.trim().length > 0;
 
   const etapaIndex = etapas.findIndex((e) => e.id === etapa);
@@ -61,9 +101,21 @@ export default function Assinatura() {
       const resposta = await fetch("/api/assinaturas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...dados, planoId: plano.id }),
+        body: JSON.stringify({
+          nome: dados.nome,
+          telefone: dados.telefone,
+          veiculo: `${dados.veiculoModelo.trim()} - ${dados.veiculoPlaca.trim().toUpperCase()}`,
+          dataNascimento: dados.dataNascimento,
+          endereco: dados.endereco,
+          planoId: plano.id,
+        }),
       });
       if (!resposta.ok) throw new Error();
+      try {
+        localStorage.removeItem(CHAVE_STORAGE);
+      } catch {
+        // localStorage indisponível, sem problema
+      }
       setEtapa("confirmacao");
     } catch {
       setErro("Não foi possível confirmar a assinatura agora. Tente novamente.");
@@ -149,21 +201,33 @@ export default function Assinatura() {
               <Campo label="Telefone *">
                 <input
                   required
+                  inputMode="numeric"
                   value={dados.telefone}
-                  onChange={(e) => atualizarCampo("telefone", e.target.value)}
+                  onChange={(e) => atualizarCampo("telefone", formatarTelefone(e.target.value))}
                   className="campo"
-                  placeholder="(11) 90000-0000"
+                  placeholder="(84) 9 0000-0000"
                 />
               </Campo>
-              <Campo label="Veículo *">
-                <input
-                  required
-                  value={dados.veiculo}
-                  onChange={(e) => atualizarCampo("veiculo", e.target.value)}
-                  className="campo"
-                  placeholder="Modelo e placa"
-                />
-              </Campo>
+              <div className="grid grid-cols-2 gap-4">
+                <Campo label="Modelo *">
+                  <input
+                    required
+                    value={dados.veiculoModelo}
+                    onChange={(e) => atualizarCampo("veiculoModelo", e.target.value)}
+                    className="campo"
+                    placeholder="HB20"
+                  />
+                </Campo>
+                <Campo label="Placa *">
+                  <input
+                    required
+                    value={dados.veiculoPlaca}
+                    onChange={(e) => atualizarCampo("veiculoPlaca", e.target.value.toUpperCase())}
+                    className="campo"
+                    placeholder="ABC1D23"
+                  />
+                </Campo>
+              </div>
               <Campo label="Data de nascimento *">
                 <input
                   required
@@ -238,7 +302,7 @@ export default function Assinatura() {
               <div className="mt-6 space-y-2 rounded-lg bg-asphalt p-4 text-left font-mono text-sm">
                 <Linha label="Plano" valor={plano.nome} />
                 <Linha label="Valor" valor={`${formatarPreco(plano.precoMensal)}/mês`} />
-                <Linha label="Veículo" valor={dados.veiculo} />
+                <Linha label="Veículo" valor={`${dados.veiculoModelo} - ${dados.veiculoPlaca}`} />
                 <Linha label="Fidelidade mínima" valor="3 meses" />
               </div>
 
