@@ -35,6 +35,7 @@ export default function Assinatura() {
   const [etapa, setEtapa] = useState<Etapa>("dados");
   const [dados, setDados] = useState<DadosCadastro>(dadosVazios);
   const [processandoPagamento, setProcessandoPagamento] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   const plano = useMemo(
     () => planos.find((p) => p.id === planoSelecionado) ?? planos[0],
@@ -53,16 +54,27 @@ export default function Assinatura() {
     setDados((atual) => ({ ...atual, [campo]: valor }));
   }
 
-  function confirmarPagamento() {
+  async function confirmarPagamento() {
     setProcessandoPagamento(true);
-    setTimeout(() => {
-      setProcessandoPagamento(false);
+    setErro(null);
+    try {
+      const resposta = await fetch("/api/assinaturas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...dados, planoId: plano.id }),
+      });
+      if (!resposta.ok) throw new Error();
       setEtapa("confirmacao");
-    }, 1500);
+    } catch {
+      setErro("Não foi possível confirmar a assinatura agora. Tente novamente.");
+    } finally {
+      setProcessandoPagamento(false);
+    }
   }
 
   function recomecar() {
     setDados(dadosVazios);
+    setErro(null);
     setEtapa("dados");
   }
 
@@ -192,6 +204,7 @@ export default function Assinatura() {
               <p className="mt-1 text-xs text-text-secondary">
                 Simulação de pagamento, nenhuma cobrança real será feita
               </p>
+              {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
 
               <div className="mt-6 flex w-full gap-3">
                 <button
