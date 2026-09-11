@@ -11,15 +11,20 @@ export default function CtaFinal() {
           Seu carro merece hora marcada.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-text-secondary">
-          Assine um plano e deixe a manutenção do seu carro no automático, ou agende um serviço
-          avulso quando precisar.
+          Escolha seu serviço, reserve seu horário e deixe o cuidado por nossa conta.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <Link
             href="#agendamento"
             className="rounded-sm bg-gold px-6 py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
           >
-            Agendar agora
+            ⚡ Agendar meu horário
+          </Link>
+          <Link
+            href="#planos"
+            className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+          >
+            Conhecer os planos
           </Link>
         </div>
       </Reveal>

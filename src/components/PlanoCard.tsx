@@ -24,13 +24,12 @@ export default function PlanoCard({
     >
       {plano.destaque && (
         <span className="mb-3 w-fit rounded-sm bg-gold px-2 py-0.5 font-mono text-[10px] font-semibold uppercase text-asphalt">
-          Mais completo
+          Mais exclusivo
         </span>
       )}
       <h3 className="font-heading text-xl font-bold">{plano.nome}</h3>
-      <p className="mt-1 font-mono text-sm text-text-secondary">
-        {plano.precoMensal != null ? `${formatarPreco(plano.precoMensal)}/mês` : "Valor sob consulta"}
-      </p>
+      <p className="mt-1 font-mono text-sm text-gold">{formatarPreco(plano.precoMensal)}/mês</p>
+      <p className="mt-2 text-sm text-text-secondary">{plano.descricao}</p>
       <ul className="mt-4 space-y-2 text-sm">
         {plano.beneficios.map((item) => (
           <li key={item} className="flex items-start gap-2 text-text-primary">
@@ -39,6 +38,13 @@ export default function PlanoCard({
           </li>
         ))}
       </ul>
+      <span
+        className={`mt-6 flex items-center gap-1 font-mono text-xs uppercase tracking-wide ${
+          plano.destaque ? "text-gold" : "text-text-secondary"
+        }`}
+      >
+        Quero ser {plano.nome} →
+      </span>
     </button>
   );
 }

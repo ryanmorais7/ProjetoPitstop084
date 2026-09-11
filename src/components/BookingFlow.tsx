@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import {
   avulsos,
   planos,
+  listaPlanos,
+  PlanoId,
+  etapasAgendamento,
   diasAgendamento,
   horariosAgendamento,
   horariosIndisponiveisMock,
@@ -85,7 +88,7 @@ export default function BookingFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoAtendimento, avulsoSelecionado, planoSelecionado]);
 
-  const plano = planos.find((p) => p.id === planoSelecionado) ?? null;
+  const plano = planoSelecionado ? planos[planoSelecionado] : null;
   const fichaValida = nome.trim().length > 1 && telefone.trim().length > 7 && carro.trim().length > 0;
 
   const indiceVisivel: Record<Etapa, number> = {
@@ -96,7 +99,9 @@ export default function BookingFlow() {
     ficha: 3,
     confirmacao: 4,
   };
-  const passos = ["Como agendar", tipoAtendimento === "assinatura" ? "Plano" : "Serviço", "Horário", "Ficha técnica", "Confirmação"];
+  const passos = etapasAgendamento.map((label, i) =>
+    i === 1 && tipoAtendimento === "assinatura" ? "Plano" : label
+  );
 
   function escolherTipo(tipo: TipoAtendimento) {
     setTipoAtendimento(tipo);
@@ -116,7 +121,7 @@ export default function BookingFlow() {
     setEtapa("horario");
   }
 
-  function escolherPlano(id: (typeof planos)[number]["id"]) {
+  function escolherPlano(id: PlanoId) {
     selecionarPlano(id);
     setEtapa("horario");
   }
@@ -282,7 +287,7 @@ export default function BookingFlow() {
             <div>
               <h3 className="font-heading text-xl font-bold">Qual plano você assina?</h3>
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {planos.map((p) => (
+                {listaPlanos.map((p) => (
                   <PlanoCard
                     key={p.id}
                     plano={p}
@@ -396,6 +401,23 @@ export default function BookingFlow() {
               <p className="mt-1 mb-6 text-sm text-text-secondary">
                 Só o essencial pra gente te receber direito.
               </p>
+
+              {slotSelecionado && (
+                <div className="mb-6 grid grid-cols-2 gap-x-4 gap-y-2 rounded-sm border border-white/10 bg-asphalt p-4 font-mono text-xs">
+                  <SpecItem
+                    label="Tipo"
+                    valor={tipoAtendimento === "assinatura" ? "Assinatura" : "Serviço avulso"}
+                  />
+                  {tipoAtendimento === "avulso" && avulsoSelecionado && (
+                    <SpecItem label="Serviço" valor={avulsoSelecionado.nome} />
+                  )}
+                  {tipoAtendimento === "assinatura" && plano && (
+                    <SpecItem label="Plano" valor={plano.nome} />
+                  )}
+                  <SpecItem label="Data" valor={slotSelecionado.dia} />
+                  <SpecItem label="Horário" valor={slotSelecionado.hora} />
+                </div>
+              )}
 
               <div className="space-y-4">
                 <label className="block">
@@ -513,6 +535,15 @@ function Linha({ label, valor }: { label: string; valor: string }) {
     <div className="flex justify-between gap-4">
       <span className="text-text-secondary">{label}</span>
       <span className="text-right text-text-primary">{valor}</span>
+    </div>
+  );
+}
+
+function SpecItem({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div>
+      <span className="block text-text-secondary uppercase tracking-wide">{label}</span>
+      <span className="text-text-primary">{valor}</span>
     </div>
   );
 }

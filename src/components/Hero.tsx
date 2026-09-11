@@ -1,10 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Bolt from "./Bolt";
-import { HERO_VIDEO_SRC, HERO_VIDEO_MOBILE_SRC, HERO_POSTER_SRC } from "@/lib/heroMedia";
+import {
+  HERO_VIDEO_SRC,
+  HERO_VIDEO_MOBILE_SRC,
+  HERO_POSTER_SRC,
+  HERO_MOBILE_POSTER_SRC,
+} from "@/lib/heroMedia";
 
 export default function Hero() {
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lê o breakpoint atual uma vez, na montagem
+    setMobile(mq.matches);
+    const aoMudar = (e: MediaQueryListEvent) => setMobile(e.matches);
+    mq.addEventListener("change", aoMudar);
+    return () => mq.removeEventListener("change", aoMudar);
+  }, []);
+
+  const poster = (mobile ? HERO_MOBILE_POSTER_SRC : null) ?? HERO_POSTER_SRC;
+
   return (
     <section className="relative flex min-h-[100svh] items-end overflow-hidden bg-asphalt">
       <div className="absolute inset-0">
@@ -15,7 +34,7 @@ export default function Hero() {
             muted
             loop
             playsInline
-            poster={HERO_POSTER_SRC ?? undefined}
+            poster={poster ?? undefined}
           >
             <source
               src={HERO_VIDEO_MOBILE_SRC ?? HERO_VIDEO_SRC}

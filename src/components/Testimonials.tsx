@@ -1,23 +1,6 @@
+import { depoimentos } from "@/lib/data";
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
-
-const depoimentos = [
-  {
-    nome: "Marcos A.",
-    carro: "HB20 2022",
-    frase: "Assinei pra não precisar mais lembrar de levar o carro pra lavar.",
-  },
-  {
-    nome: "Juliana R.",
-    carro: "Compass 2021",
-    frase: "O acabamento interno ficou impecável, parece carro novo.",
-  },
-  {
-    nome: "Felipe S.",
-    carro: "Onix 2023",
-    frase: "Marcar horário e não pegar fila mudou completamente minha rotina.",
-  },
-];
 
 export default function Testimonials() {
   return (

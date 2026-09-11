@@ -3,9 +3,9 @@ import Logo from "./Logo";
 
 const links = [
   { href: "#servicos", label: "Serviços" },
-  { href: "#experiencia", label: "Experiência" },
   { href: "#planos", label: "Planos" },
-  { href: "#historia", label: "História" },
+  { href: "#historia", label: "A Pitstop" },
+  { href: "#instagram", label: "Instagram" },
 ];
 
 export default function Header() {

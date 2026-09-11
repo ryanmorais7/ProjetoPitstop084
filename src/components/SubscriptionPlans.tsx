@@ -1,6 +1,6 @@
 "use client";
 
-import { planos } from "@/lib/data";
+import { listaPlanos, PlanoId } from "@/lib/data";
 import { useSelection } from "@/context/SelectionContext";
 import PlanoCard from "./PlanoCard";
 import Reveal from "./Reveal";
@@ -9,7 +9,7 @@ import Bolt from "./Bolt";
 export default function SubscriptionPlans() {
   const { selecionarPlano, setTipoAtendimento } = useSelection();
 
-  function escolher(id: (typeof planos)[number]["id"]) {
+  function escolher(id: PlanoId) {
     selecionarPlano(id);
     setTipoAtendimento("assinatura");
     document.getElementById("agendamento")?.scrollIntoView({ behavior: "smooth" });
@@ -24,17 +24,16 @@ export default function SubscriptionPlans() {
             Assinatura
           </div>
           <h2 className="max-w-xl font-heading text-3xl font-bold md:text-5xl">
-            Para quem o cuidado não é eventual.
+            Seu carro. Sempre em dia.
           </h2>
           <p className="mt-4 max-w-xl text-text-secondary">
-            Se você gosta de manter seu carro sempre em dia, os planos Pitstop foram pensados
-            pra transformar cuidado em rotina. Não é obrigatório assinar pra usar a Pitstop:
-            quem prefere pode continuar escolhendo um serviço avulso quando quiser.
+            Para quem prefere transformar cuidado em rotina. Não é obrigatório assinar pra usar a
+            Pitstop: quem prefere pode continuar escolhendo um serviço avulso quando quiser.
           </p>
         </Reveal>
 
         <div className="mt-12 grid gap-6 sm:grid-cols-2">
-          {planos.map((plano, i) => (
+          {listaPlanos.map((plano, i) => (
             <Reveal key={plano.id} delayMs={i * 80}>
               <PlanoCard plano={plano} onClick={() => escolher(plano.id)} />
             </Reveal>
@@ -42,7 +41,7 @@ export default function SubscriptionPlans() {
         </div>
 
         <p className="mt-6 text-xs text-text-secondary">
-          Benefícios, brindes e valores de exemplo. Detalhes finais em definição.
+          Benefícios de exemplo. Detalhes finais em definição com o cliente.
         </p>
       </div>
     </section>

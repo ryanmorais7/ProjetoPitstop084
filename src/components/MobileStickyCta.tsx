@@ -36,7 +36,7 @@ export default function MobileStickyCta() {
         href="#agendamento"
         className="block w-full rounded-sm bg-gold py-3 text-center font-heading text-sm font-semibold tracking-wide text-asphalt"
       >
-        Agendar agora
+        ⚡ Agendar meu horário
       </Link>
     </div>
   );

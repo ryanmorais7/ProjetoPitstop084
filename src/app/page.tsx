@@ -14,6 +14,7 @@ import InstagramSection from "@/components/InstagramSection";
 import LocationSection from "@/components/LocationSection";
 import BookingFlow from "@/components/BookingFlow";
 import CtaFinal from "@/components/CtaFinal";
+import Footer from "@/components/Footer";
 import MobileStickyCta from "@/components/MobileStickyCta";
 
 export default function Home() {
@@ -36,6 +37,7 @@ export default function Home() {
         <BookingFlow />
         <CtaFinal />
       </main>
+      <Footer />
       <MobileStickyCta />
     </SelectionProvider>
   );

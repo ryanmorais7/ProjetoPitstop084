@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos } from "@/db/schema";
-import { avulsos, planos, diasAgendamento, horariosAgendamento } from "@/lib/data";
+import { avulsos, planos, PlanoId, diasAgendamento, horariosAgendamento } from "@/lib/data";
 
 export async function GET() {
   const ocupados = await db
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
 
   let servico = null as (typeof avulsos)[number] | null;
-  let plano = null as (typeof planos)[number] | null;
+  let plano = null as (typeof planos)[PlanoId] | null;
 
   if (tipoAtendimento === "avulso") {
     servico = avulsos.find((s) => s.id === servicoId && !s.sobConsulta) ?? null;
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ erro: "Serviço inválido" }, { status: 400 });
     }
   } else {
-    plano = planos.find((p) => p.id === planoId) ?? null;
+    plano = planos[planoId as PlanoId] ?? null;
     if (!plano) {
       return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
     }

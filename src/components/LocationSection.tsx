@@ -10,8 +10,11 @@ export default function LocationSection() {
             <Bolt className="h-3.5 w-3.5 text-gold" />
             Localização
           </div>
-          <h2 className="font-heading text-2xl font-bold md:text-4xl">Pitstop</h2>
+          <h2 className="font-heading text-2xl font-bold md:text-4xl">
+            Seu próximo Pitstop começa aqui.
+          </h2>
           <p className="mt-2 text-text-secondary">Endereço a confirmar.</p>
+          <p className="mt-1 text-sm text-text-secondary">Horário de funcionamento a confirmar.</p>
 
           <button
             type="button"

@@ -1,3 +1,4 @@
+import { instagramPosts } from "@/lib/data";
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
 
@@ -6,7 +7,7 @@ const INSTAGRAM_URL = "https://instagram.com/";
 
 export default function InstagramSection() {
   return (
-    <section className="px-6 py-24">
+    <section id="instagram" className="px-6 py-24">
       <div className="mx-auto max-w-4xl">
         <Reveal>
           <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
@@ -20,9 +21,9 @@ export default function InstagramSection() {
 
         <Reveal delayMs={100}>
           <div className="mt-10 grid grid-cols-3 gap-2 sm:gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {instagramPosts.map((post) => (
               <div
-                key={i}
+                key={post.id}
                 className="flex aspect-square items-center justify-center rounded-sm bg-panel text-text-secondary/40"
                 aria-hidden="true"
               >
@@ -31,7 +32,7 @@ export default function InstagramSection() {
             ))}
           </div>
           <p className="mt-4 text-xs text-text-secondary">
-            Grade de exemplo, conteúdo real do Instagram entra aqui em breve.
+            Grade de exemplo, fotos e reels reais do Instagram entram aqui em breve.
           </p>
         </Reveal>
 
@@ -42,7 +43,7 @@ export default function InstagramSection() {
             rel="noopener noreferrer"
             className="mt-8 inline-flex items-center gap-2 font-heading text-sm font-semibold tracking-wide text-text-primary underline-offset-4 transition hover:text-gold hover:underline"
           >
-            Ver no Instagram
+            Seguir a Pitstop no Instagram
           </a>
         </Reveal>
       </div>

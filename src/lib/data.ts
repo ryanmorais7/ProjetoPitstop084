@@ -3,23 +3,23 @@ export type PlanoId = "premium" | "diamante";
 export interface Plano {
   id: PlanoId;
   nome: string;
-  /** null = valor ainda não definido com o cliente, exibir como "sob consulta" */
-  precoMensal: number | null;
+  precoMensal: number;
+  descricao: string;
   destaque?: boolean;
   beneficios: string[];
 }
 
 /**
- * PLACEHOLDER: benefícios, brindes e valores dos planos ainda estão sendo
- * definidos com o cliente. Tudo aqui é exemplo, centralizado neste array
- * pra ser fácil trocar quando os dados reais chegarem, sem mexer nos
- * componentes visuais (PlanoCard, SubscriptionPlans, BookingFlow).
+ * PLACEHOLDER: preço, benefícios e brindes são exemplos e ainda poderão ser
+ * alterados pelo cliente. Centralizado aqui pra trocar num lugar só, sem
+ * mexer nos componentes visuais (PlanoCard, SubscriptionPlans, BookingFlow).
  */
-export const planos: Plano[] = [
-  {
+export const planos: Record<PlanoId, Plano> = {
+  premium: {
     id: "premium",
     nome: "Premium",
-    precoMensal: null,
+    precoMensal: 149.9,
+    descricao: "Para quem quer manter o carro sempre bem cuidado.",
     beneficios: [
       "Lavagens selecionadas por mês (exemplo)",
       "Condições especiais em serviços adicionais (exemplo)",
@@ -27,10 +27,11 @@ export const planos: Plano[] = [
       "Brinde periódico (exemplo)",
     ],
   },
-  {
+  diamante: {
     id: "diamante",
     nome: "Diamante",
-    precoMensal: null,
+    precoMensal: 249.9,
+    descricao: "Para quem exige um nível ainda maior de cuidado e exclusividade.",
     destaque: true,
     beneficios: [
       "Mais serviços incluídos (exemplo)",
@@ -40,7 +41,9 @@ export const planos: Plano[] = [
       "Prioridade de agendamento (exemplo)",
     ],
   },
-];
+};
+
+export const listaPlanos: Plano[] = Object.values(planos);
 
 export interface AvulsoServico {
   id: string;
@@ -48,6 +51,10 @@ export interface AvulsoServico {
   descricao: string;
   preco: number | null;
   sobConsulta?: boolean;
+  duracao?: string;
+  imagem?: string;
+  destaque?: boolean;
+  categoria?: string;
 }
 
 export const avulsos: AvulsoServico[] = [
@@ -84,6 +91,44 @@ export const avulsos: AvulsoServico[] = [
     sobConsulta: true,
   },
 ];
+
+export interface Depoimento {
+  nome: string;
+  carro: string;
+  frase: string;
+}
+
+/** PLACEHOLDER: depoimentos de exemplo, substituir por relatos reais de clientes. */
+export const depoimentos: Depoimento[] = [
+  {
+    nome: "Marcos A.",
+    carro: "HB20 2022",
+    frase: "Assinei pra não precisar mais lembrar de levar o carro pra lavar.",
+  },
+  {
+    nome: "Juliana R.",
+    carro: "Compass 2021",
+    frase: "O acabamento interno ficou impecável, parece carro novo.",
+  },
+  {
+    nome: "Felipe S.",
+    carro: "Onix 2023",
+    frase: "Marcar horário e não pegar fila mudou completamente minha rotina.",
+  },
+];
+
+export interface InstagramPost {
+  id: string;
+  imagem?: string;
+}
+
+/** PLACEHOLDER: grade de exemplo, substituir por fotos/reels reais do Instagram. */
+export const instagramPosts: InstagramPost[] = Array.from({ length: 6 }, (_, i) => ({
+  id: `post-${i + 1}`,
+}));
+
+/** Rótulos genéricos das etapas do agendamento, usados no indicador de progresso. */
+export const etapasAgendamento = ["Como agendar", "Serviço", "Horário", "Ficha técnica", "Confirmação"];
 
 export const whatsappNumero = "5511999999999";
 
@@ -146,19 +191,24 @@ export interface DiferencialLinha {
 
 export const diferenciais: DiferencialLinha[] = [
   {
-    aspecto: "Agendamento",
-    lavaJatoComum: "Fila por ordem de chegada",
-    pitstop084: "Horário marcado, sem espera",
+    aspecto: "Atendimento",
+    lavaJatoComum: "Ordem de chegada",
+    pitstop084: "Horário reservado",
   },
   {
-    aspecto: "Serviços técnicos",
-    lavaJatoComum: "Raramente oferecidos",
-    pitstop084: "Motor, chassis e proteção disponíveis",
+    aspecto: "Abordagem",
+    lavaJatoComum: "Foco apenas na lavagem",
+    pitstop084: "Cuidado por etapas",
   },
   {
-    aspecto: "Higienização interna",
-    lavaJatoComum: "Cobrada à parte, sem padrão",
-    pitstop084: "Processo completo e padronizado",
+    aspecto: "Serviços",
+    lavaJatoComum: "Serviço padronizado",
+    pitstop084: "Estética automotiva completa",
+  },
+  {
+    aspecto: "Experiência",
+    lavaJatoComum: "Genérica",
+    pitstop084: "Personalizada, com atenção aos detalhes",
   },
   {
     aspecto: "Contratação",
