@@ -1,0 +1,518 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  avulsos,
+  planos,
+  diasAgendamento,
+  horariosAgendamento,
+  horariosIndisponiveisMock,
+  linkWhatsapp,
+  AvulsoServico,
+} from "@/lib/data";
+import { formatarPreco, formatarTelefone } from "@/lib/format";
+import { useSelection, TipoAtendimento } from "@/context/SelectionContext";
+import PlanoCard from "./PlanoCard";
+import Bolt from "./Bolt";
+
+type Etapa = "tipo" | "servico" | "plano" | "horario" | "ficha" | "confirmacao";
+
+interface Slot {
+  dia: string;
+  hora: string;
+}
+
+const diaAbreviado: Record<string, string> = {
+  Segunda: "Seg",
+  Terça: "Ter",
+  Quarta: "Qua",
+  Quinta: "Qui",
+  Sexta: "Sex",
+  Sábado: "Sáb",
+};
+
+function etapaInicial(
+  tipo: TipoAtendimento | null,
+  avulso: AvulsoServico | null,
+  plano: string | null
+): Etapa {
+  if (tipo === "avulso" && avulso) return "horario";
+  if (tipo === "assinatura" && plano) return "horario";
+  if (tipo === "assinatura") return "plano";
+  if (tipo === "avulso") return "servico";
+  return "tipo";
+}
+
+export default function BookingFlow() {
+  const {
+    tipoAtendimento,
+    setTipoAtendimento,
+    avulsoSelecionado,
+    selecionarAvulso,
+    planoSelecionado,
+    selecionarPlano,
+    reiniciarSelecao,
+  } = useSelection();
+
+  const [etapa, setEtapa] = useState<Etapa>(() =>
+    etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado)
+  );
+  const [diaSelecionadoDia, setDiaSelecionadoDia] = useState(diasAgendamento[0]);
+  const [slotSelecionado, setSlotSelecionado] = useState<Slot | null>(null);
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [carro, setCarro] = useState("");
+  const [placa, setPlaca] = useState("");
+  const [ocupados, setOcupados] = useState<Set<string>>(new Set());
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/agendamentos")
+      .then((r) => r.json())
+      .then((data: { ocupados: { dia: string; horario: string }[] }) => {
+        setOcupados(new Set(data.ocupados.map((o) => `${o.dia}-${o.horario}`)));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const alvo = etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado);
+    if (alvo !== "tipo" && (etapa === "tipo" || etapa === "servico" || etapa === "plano")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza a etapa quando o serviço/plano é escolhido em outra seção da página
+      setEtapa(alvo);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipoAtendimento, avulsoSelecionado, planoSelecionado]);
+
+  const plano = planos.find((p) => p.id === planoSelecionado) ?? null;
+  const fichaValida = nome.trim().length > 1 && telefone.trim().length > 7 && carro.trim().length > 0;
+
+  const indiceVisivel: Record<Etapa, number> = {
+    tipo: 0,
+    servico: 1,
+    plano: 1,
+    horario: 2,
+    ficha: 3,
+    confirmacao: 4,
+  };
+  const passos = ["Como agendar", tipoAtendimento === "assinatura" ? "Plano" : "Serviço", "Horário", "Ficha técnica", "Confirmação"];
+
+  function escolherTipo(tipo: TipoAtendimento) {
+    setTipoAtendimento(tipo);
+    setEtapa(tipo === "avulso" ? "servico" : "plano");
+  }
+
+  function escolherServico(servico: AvulsoServico) {
+    if (servico.sobConsulta) {
+      window.open(
+        linkWhatsapp(`Olá! Quero saber mais sobre o serviço "${servico.nome}" da Pitstop.`),
+        "_blank",
+        "noopener,noreferrer"
+      );
+      return;
+    }
+    selecionarAvulso(servico);
+    setEtapa("horario");
+  }
+
+  function escolherPlano(id: (typeof planos)[number]["id"]) {
+    selecionarPlano(id);
+    setEtapa("horario");
+  }
+
+  function selecionarSlot(hora: string) {
+    setSlotSelecionado({ dia: diaSelecionadoDia, hora });
+    setErro(null);
+  }
+
+  function trocarDia(dia: string) {
+    setDiaSelecionadoDia(dia);
+    setSlotSelecionado(null);
+  }
+
+  async function confirmarFicha() {
+    if (!slotSelecionado || !tipoAtendimento) return;
+    setEnviando(true);
+    setErro(null);
+    try {
+      const resposta = await fetch("/api/agendamentos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome,
+          telefone,
+          carro,
+          placa,
+          tipoAtendimento,
+          servicoId: avulsoSelecionado?.id,
+          planoId: planoSelecionado,
+          dia: slotSelecionado.dia,
+          horario: slotSelecionado.hora,
+        }),
+      });
+      if (resposta.status === 409) {
+        setOcupados((atual) => new Set(atual).add(`${slotSelecionado.dia}-${slotSelecionado.hora}`));
+        setSlotSelecionado(null);
+        setErro("Esse horário acabou de ser reservado por outra pessoa. Escolha outro.");
+        setEtapa("horario");
+        return;
+      }
+      if (!resposta.ok) throw new Error();
+      setEtapa("confirmacao");
+    } catch {
+      setErro("Não foi possível confirmar o agendamento agora. Tente novamente.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  function novoAgendamento() {
+    setSlotSelecionado(null);
+    setNome("");
+    setTelefone("");
+    setCarro("");
+    setPlaca("");
+    setEtapa("tipo");
+    reiniciarSelecao();
+  }
+
+  return (
+    <section id="agendamento" className="px-6 py-24">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-10">
+          <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
+            <Bolt className="h-3.5 w-3.5 text-gold" />
+            Agendamento
+          </div>
+          <h2 className="font-heading text-3xl font-bold md:text-5xl">Seu Pitstop começa aqui.</h2>
+          <p className="mt-3 text-text-secondary">
+            Escolha o serviço, o horário e deixe o resto com a gente.
+          </p>
+        </div>
+
+        {etapa !== "confirmacao" && (
+          <div className="mb-8 flex flex-wrap items-center gap-3">
+            {passos.map((label, i) => (
+              <div key={label} className="flex items-center gap-3">
+                <div className="flex flex-col items-center gap-1">
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-full font-mono text-sm ${
+                      i <= indiceVisivel[etapa] ? "bg-gold text-asphalt" : "bg-panel text-text-secondary"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="text-xs text-text-secondary">{label}</span>
+                </div>
+                {i < passos.length - 1 && (
+                  <span className={`h-px w-6 ${i < indiceVisivel[etapa] ? "bg-gold" : "bg-white/10"}`} />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="rounded-sm border border-white/10 bg-panel p-8">
+          {etapa === "tipo" && (
+            <div>
+              <h3 className="font-heading text-xl font-bold">Como você quer agendar?</h3>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => escolherTipo("avulso")}
+                  className="rounded-sm border border-white/10 bg-asphalt p-6 text-left transition hover:border-gold"
+                >
+                  <span className="font-heading text-lg font-bold">Serviço avulso</span>
+                  <p className="mt-2 text-sm text-text-secondary">
+                    Escolho um serviço agora, sem compromisso.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => escolherTipo("assinatura")}
+                  className="rounded-sm border border-white/10 bg-asphalt p-6 text-left transition hover:border-gold"
+                >
+                  <span className="font-heading text-lg font-bold">Sou assinante</span>
+                  <p className="mt-2 text-sm text-text-secondary">
+                    Já uso ou quero usar um plano Pitstop.
+                  </p>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}
+                className="mt-4 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline"
+              >
+                Ou conhecer os planos primeiro
+              </button>
+            </div>
+          )}
+
+          {etapa === "servico" && (
+            <div>
+              <h3 className="font-heading text-xl font-bold">Qual serviço você deseja?</h3>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {avulsos.map((servico) => (
+                  <button
+                    key={servico.id}
+                    type="button"
+                    onClick={() => escolherServico(servico)}
+                    className="flex flex-col rounded-sm border border-white/10 bg-asphalt p-5 text-left transition hover:border-gold"
+                  >
+                    <span className="font-heading text-base font-bold">{servico.nome}</span>
+                    <span className="mt-1 text-sm text-text-secondary">{servico.descricao}</span>
+                    <span className="mt-4 font-mono text-sm text-gold">
+                      {servico.sobConsulta ? "Sob consulta · WhatsApp" : formatarPreco(servico.preco ?? 0)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEtapa("tipo")}
+                className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+              >
+                Voltar
+              </button>
+            </div>
+          )}
+
+          {etapa === "plano" && (
+            <div>
+              <h3 className="font-heading text-xl font-bold">Qual plano você assina?</h3>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {planos.map((p) => (
+                  <PlanoCard
+                    key={p.id}
+                    plano={p}
+                    selecionado={p.id === planoSelecionado}
+                    onClick={() => escolherPlano(p.id)}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEtapa("tipo")}
+                className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+              >
+                Voltar
+              </button>
+            </div>
+          )}
+
+          {etapa === "horario" && (
+            <div>
+              <h3 className="font-heading text-xl font-bold">Quando você quer vir?</h3>
+              <p className="mt-1 mb-6 text-sm text-text-secondary">
+                {tipoAtendimento === "avulso" && avulsoSelecionado && (
+                  <>
+                    Agendando: <span className="text-gold">{avulsoSelecionado.nome}</span>
+                  </>
+                )}
+                {tipoAtendimento === "assinatura" && plano && (
+                  <>
+                    Plano: <span className="text-gold">{plano.nome}</span>
+                  </>
+                )}
+              </p>
+
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {diasAgendamento.map((dia) => (
+                  <button
+                    key={dia}
+                    type="button"
+                    onClick={() => trocarDia(dia)}
+                    className={`shrink-0 rounded-sm px-4 py-2 font-heading text-sm font-semibold transition ${
+                      dia === diaSelecionadoDia
+                        ? "bg-gold text-asphalt"
+                        : "bg-asphalt text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {diaAbreviado[dia] ?? dia}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {horariosAgendamento.map((hora) => {
+                  const chave = `${diaSelecionadoDia}-${hora}`;
+                  const indisponivel = horariosIndisponiveisMock.has(chave) || ocupados.has(chave);
+                  const selecionado =
+                    slotSelecionado?.dia === diaSelecionadoDia && slotSelecionado?.hora === hora;
+                  return (
+                    <button
+                      key={hora}
+                      type="button"
+                      disabled={indisponivel}
+                      onClick={() => selecionarSlot(hora)}
+                      className={`flex w-full items-center justify-between rounded-sm px-4 py-3 font-mono text-sm transition ${
+                        indisponivel
+                          ? "cursor-not-allowed bg-white/5 text-text-secondary/40"
+                          : selecionado
+                          ? "bg-gold text-asphalt"
+                          : "bg-asphalt text-text-primary hover:text-gold"
+                      }`}
+                    >
+                      <span>{hora}</span>
+                      <span className="text-xs uppercase">
+                        {indisponivel ? "Ocupado" : selecionado ? "Selecionado" : "Livre"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEtapa(tipoAtendimento === "assinatura" ? "plano" : "servico")}
+                  className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  disabled={!slotSelecionado}
+                  onClick={() => setEtapa("ficha")}
+                  className="flex-1 rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {slotSelecionado
+                    ? `Continuar · ${diaAbreviado[slotSelecionado.dia] ?? slotSelecionado.dia} ${slotSelecionado.hora}`
+                    : "Selecione um horário"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {etapa === "ficha" && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (fichaValida) confirmarFicha();
+              }}
+            >
+              <h3 className="font-heading text-xl font-bold">Ficha técnica</h3>
+              <p className="mt-1 mb-6 text-sm text-text-secondary">
+                Só o essencial pra gente te receber direito.
+              </p>
+
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-text-secondary">Nome *</span>
+                  <input
+                    required
+                    className="campo"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Seu nome"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-text-secondary">WhatsApp *</span>
+                  <input
+                    required
+                    inputMode="numeric"
+                    className="campo"
+                    value={telefone}
+                    onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+                    placeholder="(84) 9 0000-0000"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-text-secondary">Carro *</span>
+                  <input
+                    required
+                    className="campo"
+                    value={carro}
+                    onChange={(e) => setCarro(e.target.value)}
+                    placeholder="Modelo do carro"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-text-secondary">Placa (opcional)</span>
+                  <input
+                    className="campo"
+                    value={placa}
+                    onChange={(e) => setPlaca(e.target.value.toUpperCase())}
+                    placeholder="ABC1D23"
+                  />
+                </label>
+              </div>
+
+              {erro && <p className="mt-4 text-sm text-red-400">{erro}</p>}
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEtapa("horario")}
+                  className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!fichaValida || enviando}
+                  className="flex-1 rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {enviando ? "Confirmando..." : "Confirmar agendamento"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {etapa === "confirmacao" && slotSelecionado && (
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gold/10 text-2xl text-gold">
+                ✓
+              </div>
+              <h3 className="font-heading text-xl font-bold">Seu horário está reservado.</h3>
+
+              <div className="mt-6 space-y-2 rounded-sm bg-asphalt p-4 text-left font-mono text-sm">
+                <Linha label="Cliente" valor={nome} />
+                <Linha label="Veículo" valor={carro} />
+                {placa && <Linha label="Placa" valor={placa} />}
+                <Linha label="Tipo" valor={tipoAtendimento === "assinatura" ? "Assinatura" : "Avulso"} />
+                {tipoAtendimento === "avulso" && avulsoSelecionado && (
+                  <Linha label="Serviço" valor={avulsoSelecionado.nome} />
+                )}
+                {tipoAtendimento === "assinatura" && plano && (
+                  <Linha label="Plano" valor={plano.nome} />
+                )}
+                <Linha label="Horário" valor={`${slotSelecionado.dia}, ${slotSelecionado.hora}`} />
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <a
+                  href={linkWhatsapp(
+                    `Olá! Acabei de agendar na Pitstop pra ${slotSelecionado.dia} às ${slotSelecionado.hora}.`
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+                >
+                  Falar com a Pitstop no WhatsApp
+                </a>
+                <button
+                  onClick={novoAgendamento}
+                  className="flex-1 rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
+                >
+                  Fazer novo agendamento
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Linha({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <span className="text-text-secondary">{label}</span>
+      <span className="text-right text-text-primary">{valor}</span>
+    </div>
+  );
+}

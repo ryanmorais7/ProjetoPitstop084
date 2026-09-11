@@ -1,42 +1,38 @@
 import { diferenciais } from "@/lib/data";
+import Reveal from "./Reveal";
+import Bolt from "./Bolt";
 
 export default function Diferencial() {
   return (
-    <section id="diferencial" className="bg-surface px-6 py-20">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-10 text-center">
-          <p className="mb-3 font-mono text-sm uppercase tracking-widest text-cyan">Diferencial</p>
-          <h2 className="font-heading text-3xl font-bold md:text-4xl">
-            Lava jato comum x Pitstop 084
+    <section id="experiencia" className="px-6 py-24">
+      <div className="mx-auto max-w-2xl">
+        <Reveal>
+          <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
+            <Bolt className="h-3.5 w-3.5 text-gold" />
+            Diferencial
+          </div>
+          <h2 className="font-heading text-2xl font-bold md:text-4xl">
+            Lava jato comum. Pitstop.
           </h2>
-        </div>
+        </Reveal>
 
-        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-panel">
-          <table className="w-full min-w-[560px] border-collapse">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="p-4 text-left font-heading text-sm uppercase text-text-secondary">
-                  Aspecto
-                </th>
-                <th className="p-4 text-left font-heading text-sm uppercase text-text-secondary">
-                  Lava jato comum
-                </th>
-                <th className="p-4 text-left font-heading text-sm uppercase text-gold">
-                  Pitstop 084
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {diferenciais.map((linha, i) => (
-                <tr key={linha.aspecto} className={i % 2 === 0 ? "bg-white/[0.02]" : ""}>
-                  <td className="p-4 text-sm font-medium text-text-primary">{linha.aspecto}</td>
-                  <td className="p-4 text-sm text-text-secondary">{linha.lavaJatoComum}</td>
-                  <td className="p-4 text-sm text-cyan">{linha.pitstop084}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Reveal delayMs={100}>
+          <div className="mt-10 divide-y divide-white/10 border-t border-white/10">
+            {diferenciais.map((linha) => (
+              <div
+                key={linha.aspecto}
+                className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span className="text-sm text-text-secondary">{linha.aspecto}</span>
+                <span className="font-mono text-sm">
+                  <span className="text-text-secondary/60 line-through">{linha.lavaJatoComum}</span>
+                  {" → "}
+                  <span className="text-gold">{linha.pitstop084}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Reveal>
       </div>
     </section>
   );

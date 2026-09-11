@@ -21,9 +21,9 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 });
 
-const titulo = "Pitstop 084";
+const titulo = "Pitstop · Estética Automotiva";
 const descricao =
-  "Pitstop 084 — assinatura de lavagem automotiva premium. Lavagem detalhada, manutenção semanal e cuidado completo pro seu carro.";
+  "Estética automotiva Pitstop. Lavagem detalhada, higienização e cuidado técnico com hora marcada, por assinatura ou avulso.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://projetopitstop084.vercel.app"),

@@ -1,97 +1,89 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CarroAoVivo, carrosAoVivoMock } from "@/lib/data";
-
-const statusOrder: CarroAoVivo["status"][] = ["Na fila", "Lavando", "Secando", "Finalizado"];
-
-function proximoStatus(status: CarroAoVivo["status"]): CarroAoVivo["status"] {
-  const i = statusOrder.indexOf(status);
-  return statusOrder[(i + 1) % statusOrder.length];
-}
-
-const statusCor: Record<CarroAoVivo["status"], string> = {
-  "Na fila": "text-text-secondary",
-  Lavando: "text-cyan",
-  Secando: "text-gold",
-  Finalizado: "text-cyan",
-};
+import Bolt from "./Bolt";
+import { HERO_VIDEO_SRC, HERO_VIDEO_MOBILE_SRC, HERO_POSTER_SRC } from "@/lib/heroMedia";
 
 export default function Hero() {
-  const [carros, setCarros] = useState<CarroAoVivo[]>(carrosAoVivoMock);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setCarros((atual) => {
-        const idx = Math.floor(Math.random() * atual.length);
-        return atual.map((carro, i) =>
-          i === idx ? { ...carro, status: proximoStatus(carro.status) } : carro
-        );
-      });
-    }, 3000);
-    return () => clearInterval(id);
-  }, []);
-
   return (
-    <section className="relative overflow-hidden px-6 pb-20 pt-16 md:pt-24">
-      <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-2 md:items-center">
-        <div>
-          <p className="mb-3 font-mono text-sm uppercase tracking-widest text-cyan">
-            Assinatura automotiva
-          </p>
-          <h1 className="font-heading text-4xl font-bold leading-tight md:text-5xl">
-            Seu carro sempre pronto,{" "}
-            <span className="text-gold">sem você precisar lembrar</span>
-          </h1>
-          <p className="mt-6 max-w-md text-text-secondary">
-            Lavagem detalhada, manutenção semanal e cuidado completo com hora marcada. Você assina,
-            a gente cuida.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Link
-              href="#assinatura"
-              className="rounded-full bg-gold px-6 py-3 font-heading font-semibold text-asphalt transition hover:brightness-110"
-            >
-              Quero assinar
-            </Link>
-            <Link
-              href="#avulsos"
-              className="rounded-full border border-white/15 px-6 py-3 font-heading font-semibold text-text-primary transition hover:border-cyan hover:text-cyan"
-            >
-              Ver serviços avulsos
-            </Link>
-          </div>
-        </div>
+    <section className="relative flex min-h-[100svh] items-end overflow-hidden bg-asphalt">
+      <div className="absolute inset-0">
+        {HERO_VIDEO_SRC ? (
+          <video
+            className="h-full w-full object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            poster={HERO_POSTER_SRC ?? undefined}
+          >
+            <source
+              src={HERO_VIDEO_MOBILE_SRC ?? HERO_VIDEO_SRC}
+              media="(max-width: 768px)"
+            />
+            <source src={HERO_VIDEO_SRC} />
+          </video>
+        ) : (
+          // Placeholder até o vídeo cinematográfico (Porsche) ser definido em src/lib/heroMedia.ts
+          <div
+            className="h-full w-full"
+            style={{
+              background:
+                "radial-gradient(120% 90% at 50% 100%, rgba(217,164,65,0.14), transparent 60%), linear-gradient(180deg, #0a0a0b 0%, #111214 55%, #0a0a0b 100%)",
+            }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-asphalt via-asphalt/60 to-asphalt/20" />
+      </div>
 
-        <div className="rounded-2xl border border-white/10 bg-panel p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <span className="font-mono text-xs uppercase tracking-widest text-text-secondary">
-              Painel ao vivo
-            </span>
-            <span className="flex items-center gap-2 font-mono text-xs text-cyan">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-cyan" />
-              ao vivo
-            </span>
+      <div className="relative z-10 w-full px-6 pb-16 pt-40 md:px-12 md:pb-24">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-6 flex animate-[fadein_0.8s_ease-out] items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
+            <Bolt className="h-3.5 w-3.5 text-gold" />
+            Estética automotiva · Agendamentos abertos
           </div>
-          <ul className="space-y-3">
-            {carros.map((carro) => (
-              <li
-                key={carro.placaOuModelo}
-                className="flex items-center justify-between rounded-lg bg-asphalt px-4 py-3"
-              >
-                <span className="font-mono text-sm text-text-primary">{carro.placaOuModelo}</span>
-                <span className={`font-mono text-xs font-medium ${statusCor[carro.status]}`}>
-                  {carro.status.toUpperCase()}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-text-secondary">
-            Exemplo ilustrativo de status em tempo real do pátio.
+
+          <h1 className="animate-[fadein_0.9s_ease-out] font-heading text-[16vw] font-bold leading-[0.88] tracking-tight sm:text-7xl md:text-8xl">
+            PITSTOP
+          </h1>
+          <p className="mt-1 animate-[fadein_0.95s_ease-out] font-heading text-base font-semibold tracking-[0.15em] text-gold sm:text-xl">
+            ESTÉTICA AUTOMOTIVA
           </p>
+
+          <p className="mt-6 max-w-md animate-[fadein_1s_ease-out] text-lg text-text-primary">
+            Seu carro merece mais que uma lavagem.
+          </p>
+          <p className="mt-1 max-w-md animate-[fadein_1.1s_ease-out] text-sm text-text-secondary">
+            Cuidado, técnica e atenção aos detalhes.
+          </p>
+
+          <div className="mt-9 flex flex-wrap items-center gap-6 animate-[fadein_1.2s_ease-out]">
+            <Link
+              href="#agendamento"
+              className="rounded-sm bg-gold px-7 py-4 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
+            >
+              Agendar meu horário
+            </Link>
+            <Link
+              href="#precisa"
+              className="font-heading text-sm font-semibold tracking-wide text-text-secondary underline-offset-4 transition hover:text-text-primary hover:underline"
+            >
+              Conhecer a Pitstop ↓
+            </Link>
+          </div>
         </div>
       </div>
+
+      <div className="absolute bottom-6 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 text-text-secondary md:flex">
+        <span className="h-8 w-px animate-pulse bg-gold/60" />
+      </div>
+
+      <style>{`
+        @keyframes fadein {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </section>
   );
 }

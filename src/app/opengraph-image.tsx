@@ -14,7 +14,7 @@ export default function Image() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0c0e10",
+          background: "#0a0a0b",
           backgroundImage:
             "radial-gradient(circle at 50% 120%, rgba(217,164,65,0.18), transparent 60%)",
         }}
@@ -40,7 +40,7 @@ export default function Image() {
             color: "#9aa0a6",
           }}
         >
-          Assinatura automotiva, sempre em dia
+          Estética automotiva
         </div>
         <div
           style={{

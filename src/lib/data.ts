@@ -3,40 +3,44 @@ export type PlanoId = "premium" | "diamante";
 export interface Plano {
   id: PlanoId;
   nome: string;
-  precoMensal: number;
+  /** null = valor ainda não definido com o cliente, exibir como "sob consulta" */
+  precoMensal: number | null;
   destaque?: boolean;
-  itens: string[];
-  naoInclui?: string[];
+  beneficios: string[];
 }
 
+/**
+ * PLACEHOLDER: benefícios, brindes e valores dos planos ainda estão sendo
+ * definidos com o cliente. Tudo aqui é exemplo, centralizado neste array
+ * pra ser fácil trocar quando os dados reais chegarem, sem mexer nos
+ * componentes visuais (PlanoCard, SubscriptionPlans, BookingFlow).
+ */
 export const planos: Plano[] = [
   {
     id: "premium",
     nome: "Premium",
-    precoMensal: 149.9,
-    itens: ["Lavagem detalhada de entrada", "Manutenção semanal"],
-    naoInclui: ["Lavagem de motor", "Chassis com proteção", "Higienização interna completa"],
+    precoMensal: null,
+    beneficios: [
+      "Lavagens selecionadas por mês (exemplo)",
+      "Condições especiais em serviços adicionais (exemplo)",
+      "Benefício exclusivo para assinantes (exemplo)",
+      "Brinde periódico (exemplo)",
+    ],
   },
   {
     id: "diamante",
     nome: "Diamante",
-    precoMensal: 219.9,
+    precoMensal: null,
     destaque: true,
-    itens: [
-      "Lavagem detalhada de entrada",
-      "Manutenção semanal",
-      "Lavagem de motor",
-      "Chassis com proteção",
-      "Higienização interna completa",
+    beneficios: [
+      "Mais serviços incluídos (exemplo)",
+      "Condições especiais em serviços adicionais (exemplo)",
+      "Benefícios exclusivos (exemplo)",
+      "Brindes especiais (exemplo)",
+      "Prioridade de agendamento (exemplo)",
     ],
   },
 ];
-
-export const regrasFidelidade = {
-  fidelidadeMeses: 3,
-  textoResumo:
-    "Fidelidade mínima de 3 meses. Cancelamento antes desse prazo gera cobrança proporcional. Depois dos 3 meses, você pode cancelar ou pausar quando quiser.",
-};
 
 export interface AvulsoServico {
   id: string;
@@ -147,14 +151,9 @@ export const diferenciais: DiferencialLinha[] = [
     pitstop084: "Horário marcado, sem espera",
   },
   {
-    aspecto: "Frequência",
-    lavaJatoComum: "Só quando você lembra",
-    pitstop084: "Manutenção semanal incluída na assinatura",
-  },
-  {
-    aspecto: "Motor e chassis",
-    lavaJatoComum: "Raramente oferecido",
-    pitstop084: "Inclusos no plano Diamante",
+    aspecto: "Serviços técnicos",
+    lavaJatoComum: "Raramente oferecidos",
+    pitstop084: "Motor, chassis e proteção disponíveis",
   },
   {
     aspecto: "Higienização interna",
@@ -162,8 +161,8 @@ export const diferenciais: DiferencialLinha[] = [
     pitstop084: "Processo completo e padronizado",
   },
   {
-    aspecto: "Relacionamento",
-    lavaJatoComum: "Atendimento avulso",
-    pitstop084: "Brinde no aniversário da assinatura",
+    aspecto: "Contratação",
+    lavaJatoComum: "Só avulso",
+    pitstop084: "Avulso ou assinatura, você escolhe",
   },
 ];

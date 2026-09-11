@@ -1,23 +1,15 @@
-import { pgTable, serial, text, numeric, date, timestamp } from "drizzle-orm/pg-core";
-
-export const assinaturas = pgTable("assinaturas", {
-  id: serial("id").primaryKey(),
-  nome: text("nome").notNull(),
-  telefone: text("telefone").notNull(),
-  veiculo: text("veiculo").notNull(),
-  dataNascimento: date("data_nascimento").notNull(),
-  endereco: text("endereco"),
-  plano: text("plano").notNull(),
-  precoMensal: numeric("preco_mensal", { precision: 10, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+import { pgTable, serial, text, numeric, timestamp } from "drizzle-orm/pg-core";
 
 export const agendamentos = pgTable("agendamentos", {
   id: serial("id").primaryKey(),
   nome: text("nome").notNull(),
   telefone: text("telefone").notNull(),
-  servicoId: text("servico_id").notNull(),
-  servicoNome: text("servico_nome").notNull(),
+  carro: text("carro").notNull(),
+  placa: text("placa"),
+  tipoAtendimento: text("tipo_atendimento").notNull(),
+  plano: text("plano"),
+  servicoId: text("servico_id"),
+  servicoNome: text("servico_nome"),
   preco: numeric("preco", { precision: 10, scale: 2 }),
   dia: text("dia").notNull(),
   horario: text("horario").notNull(),

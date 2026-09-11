@@ -3,28 +3,39 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { PlanoId, AvulsoServico } from "@/lib/data";
 
+export type TipoAtendimento = "avulso" | "assinatura";
+
 interface SelectionContextValue {
+  tipoAtendimento: TipoAtendimento | null;
+  setTipoAtendimento: (tipo: TipoAtendimento | null) => void;
   planoSelecionado: PlanoId | null;
   selecionarPlano: (id: PlanoId) => void;
   avulsoSelecionado: AvulsoServico | null;
   selecionarAvulso: (servico: AvulsoServico) => void;
-  limparAvulso: () => void;
+  reiniciarSelecao: () => void;
 }
 
 const SelectionContext = createContext<SelectionContextValue | null>(null);
 
 export function SelectionProvider({ children }: { children: ReactNode }) {
+  const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento | null>(null);
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoId | null>(null);
   const [avulsoSelecionado, setAvulsoSelecionado] = useState<AvulsoServico | null>(null);
 
   return (
     <SelectionContext.Provider
       value={{
+        tipoAtendimento,
+        setTipoAtendimento,
         planoSelecionado,
         selecionarPlano: setPlanoSelecionado,
         avulsoSelecionado,
         selecionarAvulso: setAvulsoSelecionado,
-        limparAvulso: () => setAvulsoSelecionado(null),
+        reiniciarSelecao: () => {
+          setTipoAtendimento(null);
+          setPlanoSelecionado(null);
+          setAvulsoSelecionado(null);
+        },
       }}
     >
       {children}
