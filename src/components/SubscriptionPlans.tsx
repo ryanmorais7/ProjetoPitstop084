@@ -2,6 +2,7 @@
 
 import { listaPlanos, PlanoId } from "@/lib/data";
 import { useSelection } from "@/context/SelectionContext";
+import { scrollToId } from "@/lib/scroll";
 import PlanoCard from "./PlanoCard";
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
@@ -12,11 +13,11 @@ export default function SubscriptionPlans() {
   function escolher(id: PlanoId) {
     selecionarPlano(id);
     setTipoAtendimento("assinatura");
-    document.getElementById("agendamento")?.scrollIntoView({ behavior: "smooth" });
+    scrollToId("agendamento");
   }
 
   return (
-    <section id="planos" className="bg-surface px-6 py-24">
+    <section id="planos" className="px-6 py-24">
       <div className="mx-auto max-w-4xl">
         <Reveal>
           <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">

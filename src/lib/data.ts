@@ -117,16 +117,6 @@ export const depoimentos: Depoimento[] = [
   },
 ];
 
-export interface InstagramPost {
-  id: string;
-  imagem?: string;
-}
-
-/** PLACEHOLDER: grade de exemplo, substituir por fotos/reels reais do Instagram. */
-export const instagramPosts: InstagramPost[] = Array.from({ length: 6 }, (_, i) => ({
-  id: `post-${i + 1}`,
-}));
-
 /** Rótulos genéricos das etapas do agendamento, usados no indicador de progresso. */
 export const etapasAgendamento = ["Como agendar", "Serviço", "Horário", "Ficha técnica", "Confirmação"];
 
@@ -135,19 +125,6 @@ export const whatsappNumero = "5511999999999";
 export function linkWhatsapp(mensagem: string) {
   return `https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensagem)}`;
 }
-
-export interface CarroAoVivo {
-  placaOuModelo: string;
-  status: "Na fila" | "Lavando" | "Secando" | "Finalizado";
-}
-
-export const carrosAoVivoMock: CarroAoVivo[] = [
-  { placaOuModelo: "Onix Prata", status: "Lavando" },
-  { placaOuModelo: "HB20 Branco", status: "Secando" },
-  { placaOuModelo: "Compass Preto", status: "Na fila" },
-  { placaOuModelo: "Civic Cinza", status: "Finalizado" },
-  { placaOuModelo: "Corolla Prata", status: "Na fila" },
-];
 
 export const diasAgendamento = [
   "Segunda",
@@ -182,37 +159,3 @@ export const horariosIndisponiveisMock = new Set<string>([
   "Sábado-10:00",
   "Sábado-17:00",
 ]);
-
-export interface DiferencialLinha {
-  aspecto: string;
-  lavaJatoComum: string;
-  pitstop084: string;
-}
-
-export const diferenciais: DiferencialLinha[] = [
-  {
-    aspecto: "Atendimento",
-    lavaJatoComum: "Ordem de chegada",
-    pitstop084: "Horário reservado",
-  },
-  {
-    aspecto: "Abordagem",
-    lavaJatoComum: "Foco apenas na lavagem",
-    pitstop084: "Cuidado por etapas",
-  },
-  {
-    aspecto: "Serviços",
-    lavaJatoComum: "Serviço padronizado",
-    pitstop084: "Estética automotiva completa",
-  },
-  {
-    aspecto: "Experiência",
-    lavaJatoComum: "Genérica",
-    pitstop084: "Personalizada, com atenção aos detalhes",
-  },
-  {
-    aspecto: "Contratação",
-    lavaJatoComum: "Só avulso",
-    pitstop084: "Avulso ou assinatura, você escolhe",
-  },
-];

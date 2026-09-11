@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { scrollToId } from "@/lib/scroll";
 
 export default function MobileStickyCta() {
   const [visivel, setVisivel] = useState(false);
@@ -32,12 +32,13 @@ export default function MobileStickyCta() {
       }`}
       style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
-      <Link
-        href="#agendamento"
+      <button
+        type="button"
+        onClick={() => scrollToId("agendamento")}
         className="block w-full rounded-sm bg-gold py-3 text-center font-heading text-sm font-semibold tracking-wide text-asphalt"
       >
-        ⚡ Agendar meu horário
-      </Link>
+        ⚡ Agendar
+      </button>
     </div>
   );
 }

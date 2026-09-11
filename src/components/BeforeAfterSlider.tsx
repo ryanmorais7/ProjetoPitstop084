@@ -1,9 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
+import { scrollToId } from "@/lib/scroll";
+
+const galeria = [
+  "linear-gradient(135deg, #17181b, #0a0a0b)",
+  "linear-gradient(135deg, #1c1a10, #0a0a0b)",
+  "linear-gradient(135deg, #15161a, #0a0a0b)",
+  "linear-gradient(135deg, #1d1911, #0a0a0b)",
+];
 
 export default function BeforeAfterSlider() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +51,7 @@ export default function BeforeAfterSlider() {
   }
 
   return (
-    <section className="px-6 py-24">
+    <section className="bg-surface px-6 py-24">
       <div className="mx-auto max-w-4xl">
         <Reveal>
           <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
@@ -100,17 +107,29 @@ export default function BeforeAfterSlider() {
           </div>
         </Reveal>
 
-        <p className="mt-4 text-xs text-text-secondary">
-          Imagens de exemplo. Fotos reais dos resultados entram aqui em breve.
-        </p>
+        <Reveal delayMs={120}>
+          <div className="mt-4 grid grid-cols-4 gap-2">
+            {galeria.map((fundo, i) => (
+              <div
+                key={i}
+                className="aspect-square rounded-sm"
+                style={{ background: fundo }}
+              />
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-text-secondary">
+            Imagens de exemplo. Fotos reais dos resultados entram aqui em breve.
+          </p>
+        </Reveal>
 
-        <Reveal delayMs={150}>
-          <Link
-            href="#agendamento"
+        <Reveal delayMs={160}>
+          <button
+            type="button"
+            onClick={() => scrollToId("agendamento")}
             className="mt-8 inline-flex items-center gap-2 rounded-sm bg-gold px-6 py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
           >
             Quero esse cuidado
-          </Link>
+          </button>
         </Reveal>
       </div>
     </section>

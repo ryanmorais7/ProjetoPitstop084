@@ -15,6 +15,7 @@ import {
 } from "@/lib/data";
 import { formatarPreco, formatarTelefone } from "@/lib/format";
 import { useSelection, TipoAtendimento } from "@/context/SelectionContext";
+import { scrollToId } from "@/lib/scroll";
 import PlanoCard from "./PlanoCard";
 import Bolt from "./Bolt";
 
@@ -246,7 +247,7 @@ export default function BookingFlow() {
               </div>
               <button
                 type="button"
-                onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}
+                onClick={() => scrollToId("planos")}
                 className="mt-4 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline"
               >
                 Ou conhecer os planos primeiro

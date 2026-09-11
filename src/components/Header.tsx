@@ -1,11 +1,12 @@
-import Link from "next/link";
+"use client";
+
+import { scrollToId } from "@/lib/scroll";
 import Logo from "./Logo";
 
 const links = [
-  { href: "#servicos", label: "Serviços" },
-  { href: "#planos", label: "Planos" },
-  { href: "#historia", label: "A Pitstop" },
-  { href: "#instagram", label: "Instagram" },
+  { id: "sobre", label: "Sobre" },
+  { id: "servicos", label: "Serviços" },
+  { id: "planos", label: "Planos" },
 ];
 
 export default function Header() {
@@ -15,17 +16,23 @@ export default function Header() {
         <Logo className="text-base" />
         <nav className="hidden gap-8 text-sm text-text-secondary md:flex">
           {links.map((link) => (
-            <Link key={link.href} href={link.href} className="transition hover:text-text-primary">
+            <button
+              key={link.id}
+              type="button"
+              onClick={() => scrollToId(link.id)}
+              className="transition hover:text-text-primary"
+            >
               {link.label}
-            </Link>
+            </button>
           ))}
         </nav>
-        <Link
-          href="#agendamento"
+        <button
+          type="button"
+          onClick={() => scrollToId("agendamento")}
           className="rounded-sm bg-gold px-4 py-2 font-heading text-xs font-semibold tracking-wide text-asphalt transition hover:brightness-110"
         >
-          Agendar
-        </Link>
+          ⚡ Agendar
+        </button>
       </div>
     </header>
   );

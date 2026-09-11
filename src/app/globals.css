@@ -4,10 +4,10 @@
   --color-asphalt: #0a0a0b;
   --color-surface: #111214;
   --color-panel: #17181b;
-  --color-gold: #d9a441;
-  --color-gold-dim: rgba(217, 164, 65, 0.35);
-  --color-text-primary: #f2f1ec;
-  --color-text-secondary: #9aa0a6;
+  --color-gold: #e8ab1f;
+  --color-gold-dim: rgba(232, 171, 31, 0.35);
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a3a8ae;
 }
 
 @theme inline {

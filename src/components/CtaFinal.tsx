@@ -1,6 +1,8 @@
-import Link from "next/link";
+"use client";
+
 import Logo from "./Logo";
 import Reveal from "./Reveal";
+import { scrollToId } from "@/lib/scroll";
 
 export default function CtaFinal() {
   return (
@@ -14,18 +16,20 @@ export default function CtaFinal() {
           Escolha seu serviço, reserve seu horário e deixe o cuidado por nossa conta.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
-          <Link
-            href="#agendamento"
+          <button
+            type="button"
+            onClick={() => scrollToId("agendamento")}
             className="rounded-sm bg-gold px-6 py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
           >
             ⚡ Agendar meu horário
-          </Link>
-          <Link
-            href="#planos"
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToId("planos")}
             className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
           >
             Conhecer os planos
-          </Link>
+          </button>
         </div>
       </Reveal>
     </section>

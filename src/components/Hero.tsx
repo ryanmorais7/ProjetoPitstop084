@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import Bolt from "./Bolt";
+import { scrollToId } from "@/lib/scroll";
 import {
   HERO_VIDEO_SRC,
   HERO_VIDEO_MOBILE_SRC,
@@ -48,7 +48,7 @@ export default function Hero() {
             className="h-full w-full"
             style={{
               background:
-                "radial-gradient(120% 90% at 50% 100%, rgba(217,164,65,0.14), transparent 60%), linear-gradient(180deg, #0a0a0b 0%, #111214 55%, #0a0a0b 100%)",
+                "radial-gradient(120% 90% at 50% 100%, rgba(230,167,35,0.16), transparent 60%), linear-gradient(180deg, #0a0a0b 0%, #111214 55%, #0a0a0b 100%)",
             }}
           />
         )}
@@ -56,39 +56,35 @@ export default function Hero() {
       </div>
 
       <div className="relative z-10 w-full px-6 pb-16 pt-40 md:px-12 md:pb-24">
-        <div className="mx-auto max-w-5xl">
-          <div className="mb-6 flex animate-[fadein_0.8s_ease-out] items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
-            <Bolt className="h-3.5 w-3.5 text-gold" />
-            Estética automotiva · Agendamentos abertos
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-5 flex animate-[fadein_0.8s_ease-out] items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-gold">
+            <Bolt className="h-3.5 w-3.5" />
+            Estética automotiva · Pitstop 084
           </div>
 
-          <h1 className="animate-[fadein_0.9s_ease-out] font-heading text-[16vw] font-bold leading-[0.88] tracking-tight sm:text-7xl md:text-8xl">
-            PITSTOP
-          </h1>
-          <p className="mt-1 animate-[fadein_0.95s_ease-out] font-heading text-base font-semibold tracking-[0.15em] text-gold sm:text-xl">
-            ESTÉTICA AUTOMOTIVA
-          </p>
-
-          <p className="mt-6 max-w-md animate-[fadein_1s_ease-out] text-lg text-text-primary">
+          <h1 className="animate-[fadein_0.9s_ease-out] font-heading text-4xl font-bold leading-[1.02] tracking-tight text-white sm:text-6xl md:text-7xl">
             Seu carro merece mais que uma lavagem.
-          </p>
-          <p className="mt-1 max-w-md animate-[fadein_1.1s_ease-out] text-sm text-text-secondary">
+          </h1>
+
+          <p className="mt-4 max-w-md animate-[fadein_1.05s_ease-out] text-base text-text-secondary sm:text-lg">
             Cuidado, técnica e atenção aos detalhes.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-6 animate-[fadein_1.2s_ease-out]">
-            <Link
-              href="#agendamento"
+            <button
+              type="button"
+              onClick={() => scrollToId("agendamento")}
               className="rounded-sm bg-gold px-7 py-4 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
             >
-              Agendar meu horário
-            </Link>
-            <Link
-              href="#precisa"
-              className="font-heading text-sm font-semibold tracking-wide text-text-secondary underline-offset-4 transition hover:text-text-primary hover:underline"
+              ⚡ Agendar meu horário
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToId("sobre")}
+              className="font-heading text-sm font-semibold tracking-wide text-text-secondary underline-offset-4 transition hover:text-white hover:underline"
             >
               Conhecer a Pitstop ↓
-            </Link>
+            </button>
           </div>
         </div>
       </div>
