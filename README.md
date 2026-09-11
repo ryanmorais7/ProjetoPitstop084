@@ -21,7 +21,7 @@ Acesse [http://localhost:3000](http://localhost:3000).
 
 ## Estrutura
 
-- `src/components` — cada seção da landing (Hero, Sobre, Planos, Assinatura, Avulsos,
+- `src/components`: cada seção da landing (Hero, Sobre, Planos, Assinatura, Avulsos,
   Agendamento, Diferencial, CTA final)
-- `src/lib/data.ts` — planos, serviços avulsos, regras de fidelidade e horários
-- `src/context/SelectionContext.tsx` — compartilha o plano/serviço escolhido entre as seções
+- `src/lib/data.ts`: planos, serviços avulsos, regras de fidelidade e horários
+- `src/context/SelectionContext.tsx`: compartilha o plano/serviço escolhido entre as seções

@@ -22,7 +22,7 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl">
         <p className="mx-auto max-w-md text-center text-sm text-text-secondary sm:mx-0 sm:text-left">
           <span className="text-gold">&ldquo;</span>
-          {depoimento.frase} <span className="text-text-secondary/70">— {depoimento.nome}</span>
+          {depoimento.frase} <span className="text-text-secondary/70">· {depoimento.nome}</span>
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-6 border-t border-white/10 pt-8 text-center sm:flex-row sm:justify-between sm:text-left">
