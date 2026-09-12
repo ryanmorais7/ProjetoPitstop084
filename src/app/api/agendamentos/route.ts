@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos } from "@/db/schema";
-import { avulsos, planos, PlanoId, diasAgendamento, horariosAgendamento } from "@/lib/data";
+import {
+  avulsos,
+  planos,
+  PlanoId,
+  servicosPlano,
+  diasAgendamento,
+  horariosAgendamento,
+} from "@/lib/data";
 
 export async function GET() {
   const ocupados = await db
@@ -14,7 +21,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { nome, telefone, carro, placa, tipoAtendimento, servicoId, planoId, dia, horario } =
+  const { nome, telefone, carro, placa, tipoAtendimento, servicoId, planoId, servicoPlano, dia, horario } =
     body ?? {};
 
   if (
@@ -30,6 +37,7 @@ export async function POST(request: Request) {
 
   let servico = null as (typeof avulsos)[number] | null;
   let plano = null as (typeof planos)[PlanoId] | null;
+  let servicoPlanoNome: string | null = null;
 
   if (tipoAtendimento === "avulso") {
     servico = avulsos.find((s) => s.id === servicoId && !s.sobConsulta) ?? null;
@@ -38,9 +46,10 @@ export async function POST(request: Request) {
     }
   } else {
     plano = planos[planoId as PlanoId] ?? null;
-    if (!plano) {
-      return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
+    if (!plano || typeof servicoPlano !== "string" || !servicosPlano.includes(servicoPlano)) {
+      return NextResponse.json({ erro: "Plano ou serviço do plano inválido" }, { status: 400 });
     }
+    servicoPlanoNome = servicoPlano;
   }
 
   const existente = await db
@@ -63,7 +72,7 @@ export async function POST(request: Request) {
       tipoAtendimento,
       plano: plano?.id ?? null,
       servicoId: servico?.id ?? null,
-      servicoNome: servico?.nome ?? null,
+      servicoNome: servico?.nome ?? servicoPlanoNome,
       preco: servico?.preco != null ? servico.preco.toFixed(2) : null,
       dia,
       horario,

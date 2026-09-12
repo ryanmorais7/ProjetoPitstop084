@@ -1,6 +1,7 @@
 "use client";
 
 import { scrollToId } from "@/lib/scroll";
+import { useSelection } from "@/context/SelectionContext";
 import Logo from "./Logo";
 
 const links = [
@@ -10,6 +11,13 @@ const links = [
 ];
 
 export default function Header() {
+  const { setTipoAtendimento } = useSelection();
+
+  function souAssinante() {
+    setTipoAtendimento("assinatura");
+    scrollToId("agendamento");
+  }
+
   return (
     <header className="fixed top-0 z-40 w-full border-b border-white/5 bg-asphalt/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -26,13 +34,22 @@ export default function Header() {
             </button>
           ))}
         </nav>
-        <button
-          type="button"
-          onClick={() => scrollToId("agendamento")}
-          className="rounded-sm bg-gold px-4 py-2 font-heading text-xs font-semibold tracking-wide text-asphalt transition hover:brightness-110"
-        >
-          ⚡ Agendar
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={souAssinante}
+            className="hidden font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 transition hover:text-gold hover:underline md:inline"
+          >
+            Sou assinante
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToId("agendamento")}
+            className="rounded-sm bg-gold px-4 py-2 font-heading text-xs font-semibold tracking-wide text-asphalt transition hover:brightness-110"
+          >
+            ⚡ Agendar
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -45,6 +45,9 @@ export const planos: Record<PlanoId, Plano> = {
 
 export const listaPlanos: Plano[] = Object.values(planos);
 
+/** Serviços que um assinante pode agendar dentro do próprio plano. */
+export const servicosPlano = ["Lavagem semanal", "Outro serviço disponível no plano"];
+
 export interface AvulsoServico {
   id: string;
   nome: string;

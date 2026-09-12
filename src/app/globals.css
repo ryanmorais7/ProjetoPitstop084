@@ -8,6 +8,10 @@
   --color-gold-dim: rgba(232, 171, 31, 0.35);
   --color-text-primary: #ffffff;
   --color-text-secondary: #a3a8ae;
+  --color-light: #f5f4f0;
+  --color-light-panel: #eae8e1;
+  --color-light-text: #0a0a0b;
+  --color-light-text-secondary: #55534c;
 }
 
 @theme inline {
@@ -18,6 +22,10 @@
   --color-gold-dim: var(--color-gold-dim);
   --color-text-primary: var(--color-text-primary);
   --color-text-secondary: var(--color-text-secondary);
+  --color-light: var(--color-light);
+  --color-light-panel: var(--color-light-panel);
+  --color-light-text: var(--color-light-text);
+  --color-light-text-secondary: var(--color-light-text-secondary);
 
   --font-heading: var(--font-rajdhani);
   --font-body: var(--font-manrope);

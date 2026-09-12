@@ -6,6 +6,7 @@ import {
   planos,
   listaPlanos,
   PlanoId,
+  servicosPlano,
   etapasAgendamento,
   diasAgendamento,
   horariosAgendamento,
@@ -19,7 +20,7 @@ import { scrollToId } from "@/lib/scroll";
 import PlanoCard from "./PlanoCard";
 import Bolt from "./Bolt";
 
-type Etapa = "tipo" | "servico" | "plano" | "horario" | "ficha" | "confirmacao";
+type Etapa = "tipo" | "servico" | "plano" | "servicoPlano" | "horario" | "ficha" | "confirmacao";
 
 interface Slot {
   dia: string;
@@ -38,10 +39,12 @@ const diaAbreviado: Record<string, string> = {
 function etapaInicial(
   tipo: TipoAtendimento | null,
   avulso: AvulsoServico | null,
-  plano: string | null
+  plano: string | null,
+  servicoPlano: string | null
 ): Etapa {
   if (tipo === "avulso" && avulso) return "horario";
-  if (tipo === "assinatura" && plano) return "horario";
+  if (tipo === "assinatura" && plano && servicoPlano) return "horario";
+  if (tipo === "assinatura" && plano) return "servicoPlano";
   if (tipo === "assinatura") return "plano";
   if (tipo === "avulso") return "servico";
   return "tipo";
@@ -58,8 +61,9 @@ export default function BookingFlow() {
     reiniciarSelecao,
   } = useSelection();
 
+  const [servicoPlano, setServicoPlano] = useState<string | null>(null);
   const [etapa, setEtapa] = useState<Etapa>(() =>
-    etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado)
+    etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado, servicoPlano)
   );
   const [diaSelecionadoDia, setDiaSelecionadoDia] = useState(diasAgendamento[0]);
   const [slotSelecionado, setSlotSelecionado] = useState<Slot | null>(null);
@@ -81,7 +85,7 @@ export default function BookingFlow() {
   }, []);
 
   useEffect(() => {
-    const alvo = etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado);
+    const alvo = etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado, servicoPlano);
     if (alvo !== "tipo" && (etapa === "tipo" || etapa === "servico" || etapa === "plano")) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza a etapa quando o serviço/plano é escolhido em outra seção da página
       setEtapa(alvo);
@@ -96,6 +100,7 @@ export default function BookingFlow() {
     tipo: 0,
     servico: 1,
     plano: 1,
+    servicoPlano: 1,
     horario: 2,
     ficha: 3,
     confirmacao: 4,
@@ -124,6 +129,11 @@ export default function BookingFlow() {
 
   function escolherPlano(id: PlanoId) {
     selecionarPlano(id);
+    setEtapa("servicoPlano");
+  }
+
+  function escolherServicoPlano(nome: string) {
+    setServicoPlano(nome);
     setEtapa("horario");
   }
 
@@ -153,6 +163,7 @@ export default function BookingFlow() {
           tipoAtendimento,
           servicoId: avulsoSelecionado?.id,
           planoId: planoSelecionado,
+          servicoPlano,
           dia: slotSelecionado.dia,
           horario: slotSelecionado.hora,
         }),
@@ -179,20 +190,23 @@ export default function BookingFlow() {
     setTelefone("");
     setCarro("");
     setPlaca("");
+    setServicoPlano(null);
     setEtapa("tipo");
     reiniciarSelecao();
   }
 
   return (
-    <section id="agendamento" className="px-6 py-24">
+    <section id="agendamento" className="bg-light px-6 py-24">
       <div className="mx-auto max-w-3xl">
         <div className="mb-10">
-          <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
+          <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-light-text-secondary">
             <Bolt className="h-3.5 w-3.5 text-gold" />
             Agendamento
           </div>
-          <h2 className="font-heading text-3xl font-bold md:text-5xl">Seu Pitstop começa aqui.</h2>
-          <p className="mt-3 text-text-secondary">
+          <h2 className="font-heading text-3xl font-bold text-light-text md:text-5xl">
+            Seu Pitstop começa aqui.
+          </h2>
+          <p className="mt-3 text-light-text-secondary">
             Escolha o serviço, o horário e deixe o resto com a gente.
           </p>
         </div>
@@ -204,15 +218,19 @@ export default function BookingFlow() {
                 <div className="flex flex-col items-center gap-1">
                   <span
                     className={`flex h-8 w-8 items-center justify-center rounded-full font-mono text-sm ${
-                      i <= indiceVisivel[etapa] ? "bg-gold text-asphalt" : "bg-panel text-text-secondary"
+                      i <= indiceVisivel[etapa]
+                        ? "bg-gold text-asphalt"
+                        : "bg-light-panel text-light-text-secondary"
                     }`}
                   >
                     {i + 1}
                   </span>
-                  <span className="text-xs text-text-secondary">{label}</span>
+                  <span className="text-xs text-light-text-secondary">{label}</span>
                 </div>
                 {i < passos.length - 1 && (
-                  <span className={`h-px w-6 ${i < indiceVisivel[etapa] ? "bg-gold" : "bg-white/10"}`} />
+                  <span
+                    className={`h-px w-6 ${i < indiceVisivel[etapa] ? "bg-gold" : "bg-black/10"}`}
+                  />
                 )}
               </div>
             ))}
@@ -307,6 +325,34 @@ export default function BookingFlow() {
             </div>
           )}
 
+          {etapa === "servicoPlano" && (
+            <div>
+              <h3 className="font-heading text-xl font-bold">Qual serviço você quer agendar?</h3>
+              <p className="mt-1 mb-6 text-sm text-text-secondary">
+                Plano: <span className="text-gold">{plano?.nome}</span>
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {servicosPlano.map((nome) => (
+                  <button
+                    key={nome}
+                    type="button"
+                    onClick={() => escolherServicoPlano(nome)}
+                    className="rounded-sm border border-white/10 bg-asphalt p-5 text-left font-heading text-base font-bold transition hover:border-gold"
+                  >
+                    {nome}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEtapa("plano")}
+                className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+              >
+                Voltar
+              </button>
+            </div>
+          )}
+
           {etapa === "horario" && (
             <div>
               <h3 className="font-heading text-xl font-bold">Quando você quer vir?</h3>
@@ -319,6 +365,7 @@ export default function BookingFlow() {
                 {tipoAtendimento === "assinatura" && plano && (
                   <>
                     Plano: <span className="text-gold">{plano.nome}</span>
+                    {servicoPlano && <> · {servicoPlano}</>}
                   </>
                 )}
               </p>
@@ -372,7 +419,7 @@ export default function BookingFlow() {
               <div className="mt-6 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setEtapa(tipoAtendimento === "assinatura" ? "plano" : "servico")}
+                  onClick={() => setEtapa(tipoAtendimento === "assinatura" ? "servicoPlano" : "servico")}
                   className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
                 >
                   Voltar
@@ -398,7 +445,9 @@ export default function BookingFlow() {
                 if (fichaValida) confirmarFicha();
               }}
             >
-              <h3 className="font-heading text-xl font-bold">Ficha técnica</h3>
+              <h3 className="flex items-center gap-2 font-heading text-xl font-bold">
+                Ficha técnica <Bolt className="h-4 w-4 text-gold" />
+              </h3>
               <p className="mt-1 mb-6 text-sm text-text-secondary">
                 Só o essencial pra gente te receber direito.
               </p>
@@ -413,7 +462,10 @@ export default function BookingFlow() {
                     <SpecItem label="Serviço" valor={avulsoSelecionado.nome} />
                   )}
                   {tipoAtendimento === "assinatura" && plano && (
-                    <SpecItem label="Plano" valor={plano.nome} />
+                    <>
+                      <SpecItem label="Plano" valor={plano.nome} />
+                      {servicoPlano && <SpecItem label="Serviço" valor={servicoPlano} />}
+                    </>
                   )}
                   <SpecItem label="Data" valor={slotSelecionado.dia} />
                   <SpecItem label="Horário" valor={slotSelecionado.hora} />
@@ -500,7 +552,10 @@ export default function BookingFlow() {
                   <Linha label="Serviço" valor={avulsoSelecionado.nome} />
                 )}
                 {tipoAtendimento === "assinatura" && plano && (
-                  <Linha label="Plano" valor={plano.nome} />
+                  <>
+                    <Linha label="Plano" valor={plano.nome} />
+                    {servicoPlano && <Linha label="Serviço" valor={servicoPlano} />}
+                  </>
                 )}
                 <Linha label="Horário" valor={`${slotSelecionado.dia}, ${slotSelecionado.hora}`} />
               </div>

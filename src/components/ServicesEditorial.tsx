@@ -83,6 +83,7 @@ export default function ServicesEditorial() {
                 />
                 <div className="flex flex-1 flex-col p-5">
                   <h3 className="font-heading text-lg font-bold">{servico.nome}</h3>
+                  <p className="mt-1 text-sm text-text-secondary">{servico.descricao}</p>
                   <p className="mt-2 font-mono text-xl font-bold text-gold">
                     {servico.sobConsulta ? "Sob consulta" : formatarPreco(servico.preco ?? 0)}
                   </p>

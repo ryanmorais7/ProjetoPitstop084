@@ -1,6 +1,7 @@
 import { SelectionProvider } from "@/context/SelectionContext";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
+import SubscriptionNudge from "@/components/SubscriptionNudge";
 import SobreDiferencial from "@/components/SobreDiferencial";
 import ServicesEditorial from "@/components/ServicesEditorial";
 import SubscriptionPlans from "@/components/SubscriptionPlans";
@@ -16,6 +17,7 @@ export default function Home() {
       <Header />
       <main className="flex-1">
         <Hero />
+        <SubscriptionNudge />
         <SobreDiferencial />
         <ServicesEditorial />
         <SubscriptionPlans />
