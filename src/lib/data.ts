@@ -1,52 +1,102 @@
-export type PlanoId = "premium" | "diamante";
+export type PlanoId = "black" | "gold" | "diamante";
+
+export interface CategoriaVeiculo {
+  id: string;
+  nome: string;
+  descricao: string;
+  precoMensal: number;
+}
+
+export interface BeneficioPlano {
+  numero: string;
+  titulo: string;
+  descricao: string;
+}
 
 export interface Plano {
   id: PlanoId;
   nome: string;
-  precoMensal: number;
   descricao: string;
+  /** false = detalhes ainda em definição com o cliente, não exibir preço/benefícios */
+  disponivel: boolean;
   destaque?: boolean;
-  beneficios: string[];
+  categorias?: CategoriaVeiculo[];
+  beneficios?: BeneficioPlano[];
 }
 
 /**
- * PLACEHOLDER: preço, benefícios e brindes são exemplos e ainda poderão ser
- * alterados pelo cliente. Centralizado aqui pra trocar num lugar só, sem
- * mexer nos componentes visuais (PlanoCard, SubscriptionPlans, BookingFlow).
+ * A Pitstop 084 tem três níveis de assinatura. Black e Gold ainda não têm
+ * preço/benefícios definidos com o cliente, por isso ficam com
+ * `disponivel: false` (aparecem na landing como "em breve", sem inventar
+ * valores). Diamante já tem dados reais.
  */
 export const planos: Record<PlanoId, Plano> = {
-  premium: {
-    id: "premium",
-    nome: "Premium",
-    precoMensal: 149.9,
-    descricao: "Para quem quer manter o carro sempre bem cuidado.",
-    beneficios: [
-      "Lavagens selecionadas por mês (exemplo)",
-      "Condições especiais em serviços adicionais (exemplo)",
-      "Benefício exclusivo para assinantes (exemplo)",
-      "Brinde periódico (exemplo)",
-    ],
+  black: {
+    id: "black",
+    nome: "Black",
+    descricao: "Detalhes em definição com a Pitstop 084.",
+    disponivel: false,
+  },
+  gold: {
+    id: "gold",
+    nome: "Gold",
+    descricao: "Detalhes em definição com a Pitstop 084.",
+    disponivel: false,
   },
   diamante: {
     id: "diamante",
     nome: "Diamante",
-    precoMensal: 249.9,
-    descricao: "Para quem exige um nível ainda maior de cuidado e exclusividade.",
+    descricao:
+      "O cuidado mais completo da Pitstop 084 para quem não abre mão de ter o carro sempre impecável.",
+    disponivel: true,
     destaque: true,
+    categorias: [
+      { id: "p", nome: "Carro P", descricao: "Hatch e Sedan", precoMensal: 329.9 },
+      { id: "g", nome: "Carro G", descricao: "SUV e Pick-up", precoMensal: 389.9 },
+    ],
     beneficios: [
-      "Mais serviços incluídos (exemplo)",
-      "Condições especiais em serviços adicionais (exemplo)",
-      "Benefícios exclusivos (exemplo)",
-      "Brindes especiais (exemplo)",
-      "Prioridade de agendamento (exemplo)",
+      {
+        numero: "01",
+        titulo: "1 lavagem Diamante mensal",
+        descricao:
+          "O tratamento mais completo da Pitstop 084, pensado para entregar o máximo em cuidado, proteção e acabamento.",
+      },
+      {
+        numero: "02",
+        titulo: "2 lavagens Gold mensais",
+        descricao: "Tratamento completo de conservação e proteção.",
+      },
+      {
+        numero: "03",
+        titulo: "Manutenção semanal ilimitada",
+        descricao: "Mantenha seu veículo sempre impecável, com manutenções durante todo o mês.",
+      },
+      {
+        numero: "04",
+        titulo: "Atendimento prioritário",
+        descricao: "Seu veículo tratado com prioridade na agenda.",
+      },
+      {
+        numero: "05",
+        titulo: "Serviço leva e busca",
+        descricao: "Mais comodidade: nós cuidamos do deslocamento do veículo.",
+      },
+      {
+        numero: "06",
+        titulo: "20% off em todos os serviços adicionais",
+        descricao: "",
+      },
     ],
   },
 };
 
 export const listaPlanos: Plano[] = Object.values(planos);
 
-/** Serviços que um assinante pode agendar dentro do próprio plano. */
-export const servicosPlano = ["Lavagem semanal", "Outro serviço disponível no plano"];
+export const regraUtilizacaoPlanos =
+  "Os serviços inclusos no plano são válidos dentro do ciclo mensal vigente. Utilizações não realizadas dentro do período não acumulam para o próximo ciclo.";
+
+/** Serviços que um assinante Diamante pode agendar dentro do próprio plano. */
+export const servicosPlanoDiamante = ["Lavagem Diamante", "Lavagem Gold", "Manutenção semanal"];
 
 export interface AvulsoServico {
   id: string;
@@ -54,7 +104,9 @@ export interface AvulsoServico {
   descricao: string;
   preco: number | null;
   sobConsulta?: boolean;
+  itens?: string[];
   duracao?: string;
+  resultado?: string;
   imagem?: string;
   destaque?: boolean;
   categoria?: string;
@@ -62,10 +114,18 @@ export interface AvulsoServico {
 
 export const avulsos: AvulsoServico[] = [
   {
-    id: "lavagem-simples",
-    nome: "Lavagem simples",
-    descricao: "Lavagem externa completa com produtos próprios.",
+    id: "ducha-pitstop",
+    nome: "Ducha Pitstop",
+    descricao: "Uma limpeza rápida para manter o veículo sempre limpo e apresentável.",
     preco: 49.9,
+    itens: [
+      "Lavagem externa completa",
+      "Secagem detalhada de toda a carroceria",
+      "Secagem das caixas de portas",
+      "Aplicação de pretinho nos pneus",
+    ],
+    duracao: "Aproximadamente 45 minutos",
+    resultado: "Veículo limpo, seco e com pneus renovados.",
   },
   {
     id: "lavagem-detalhada",
@@ -95,39 +155,38 @@ export const avulsos: AvulsoServico[] = [
   },
 ];
 
-export interface Depoimento {
+export interface DuchaAddon {
+  id: string;
   nome: string;
-  carro: string;
-  frase: string;
+  /** null = preço ainda não definido com o cliente */
+  preco: number | null;
 }
 
-/** PLACEHOLDER: depoimentos de exemplo, substituir por relatos reais de clientes. */
-export const depoimentos: Depoimento[] = [
-  {
-    nome: "Marcos A.",
-    carro: "HB20 2022",
-    frase: "Assinei pra não precisar mais lembrar de levar o carro pra lavar.",
-  },
-  {
-    nome: "Juliana R.",
-    carro: "Compass 2021",
-    frase: "O acabamento interno ficou impecável, parece carro novo.",
-  },
-  {
-    nome: "Felipe S.",
-    carro: "Onix 2023",
-    frase: "Marcar horário e não pegar fila mudou completamente minha rotina.",
-  },
+export const duchaAddons: DuchaAddon[] = [
+  { id: "pretinho", nome: "Pretinho", preco: null },
+  { id: "cera", nome: "Cera", preco: null },
+  { id: "protetor-plasticos", nome: "Protetor de plásticos", preco: null },
+  { id: "protecao-chassi", nome: "Proteção de chassi", preco: null },
 ];
 
 /** Rótulos genéricos das etapas do agendamento, usados no indicador de progresso. */
-export const etapasAgendamento = ["Como agendar", "Serviço", "Horário", "Ficha técnica", "Confirmação"];
+export const etapasAgendamento = ["Como agendar", "Serviço", "Horário", "Ficha técnica", "PitPass"];
 
 export const whatsappNumero = "5511999999999";
 
 export function linkWhatsapp(mensagem: string) {
   return `https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensagem)}`;
 }
+
+export const enderecoPitstop = {
+  nome: "Pitstop 084",
+  linha1: "Av. Presidente Café Filho, 522",
+  linha2: "Praia do Meio",
+};
+
+export const linkComoChegar = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+  `${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}`
+)}`;
 
 export const diasAgendamento = [
   "Segunda",

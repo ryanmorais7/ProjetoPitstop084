@@ -8,6 +8,7 @@ export const agendamentos = pgTable("agendamentos", {
   placa: text("placa"),
   tipoAtendimento: text("tipo_atendimento").notNull(),
   plano: text("plano"),
+  categoriaVeiculo: text("categoria_veiculo"),
   servicoId: text("servico_id"),
   servicoNome: text("servico_nome"),
   preco: numeric("preco", { precision: 10, scale: 2 }),

@@ -59,7 +59,7 @@ export default function Hero() {
         <div className="mx-auto max-w-3xl">
           <div className="mb-5 flex animate-[fadein_0.8s_ease-out] items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-gold">
             <Bolt className="h-3.5 w-3.5" />
-            Estética automotiva · Pitstop 084
+            Estética automotiva • Pitstop 084
           </div>
 
           <h1 className="animate-[fadein_0.9s_ease-out] font-heading text-4xl font-bold leading-[1.02] tracking-tight text-white sm:text-6xl md:text-7xl">

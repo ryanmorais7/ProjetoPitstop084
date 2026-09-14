@@ -10,10 +10,10 @@ export default function CtaFinal() {
       <Reveal className="mx-auto max-w-3xl rounded-sm border border-gold/25 bg-panel p-10 text-center">
         <Logo className="text-xl" />
         <h2 className="mt-4 font-heading text-3xl font-bold md:text-4xl">
-          Seu carro merece hora marcada.
+          Seu carro. Nosso padrão.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-text-secondary">
-          Escolha seu serviço, reserve seu horário e deixe o cuidado por nossa conta.
+          Escolha seu cuidado, reserve seu horário e deixe o resto com a Pitstop 084.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <button
