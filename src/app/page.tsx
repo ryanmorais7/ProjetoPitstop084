@@ -5,7 +5,6 @@ import SubscriptionNudge from "@/components/SubscriptionNudge";
 import SobreDiferencial from "@/components/SobreDiferencial";
 import DuchaPitstop from "@/components/DuchaPitstop";
 import SubscriptionPlans from "@/components/SubscriptionPlans";
-import DiamanteExperience from "@/components/DiamanteExperience";
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import BookingFlow from "@/components/BookingFlow";
 import EnderecoSection from "@/components/EnderecoSection";
@@ -23,7 +22,6 @@ export default function Home() {
         <SobreDiferencial />
         <DuchaPitstop />
         <SubscriptionPlans />
-        <DiamanteExperience />
         <BeforeAfterSlider />
         <BookingFlow />
         <EnderecoSection />

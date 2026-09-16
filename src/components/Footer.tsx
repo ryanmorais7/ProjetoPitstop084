@@ -10,8 +10,7 @@ const links = [
   { id: "agendamento", label: "Agendamento" },
 ];
 
-// Placeholder até a @ real ser definida.
-const INSTAGRAM_URL = "https://instagram.com/";
+const INSTAGRAM_URL = "https://www.instagram.com/pitstop084";
 
 export default function Footer() {
   return (

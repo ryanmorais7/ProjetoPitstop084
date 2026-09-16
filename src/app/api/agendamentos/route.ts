@@ -3,10 +3,12 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos } from "@/db/schema";
 import {
-  avulsos,
+  todosServicos,
   planos,
   PlanoId,
-  servicosPlanoDiamante,
+  servicosPorPlano,
+  precoServico,
+  VehicleSize,
   diasAgendamento,
   horariosAgendamento,
 } from "@/lib/data";
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
     tipoAtendimento,
     servicoId,
     planoId,
-    categoriaVeiculo,
+    porteVeiculo,
     servicoPlano,
     dia,
     horario,
@@ -40,38 +42,35 @@ export async function POST(request: Request) {
     typeof telefone !== "string" || telefone.trim().length < 8 ||
     typeof carro !== "string" || carro.trim().length < 1 ||
     (tipoAtendimento !== "avulso" && tipoAtendimento !== "assinatura") ||
+    (porteVeiculo !== "P" && porteVeiculo !== "G") ||
     typeof dia !== "string" || !diasAgendamento.includes(dia) ||
     typeof horario !== "string" || !horariosAgendamento.includes(horario)
   ) {
     return NextResponse.json({ erro: "Dados obrigatórios inválidos" }, { status: 400 });
   }
 
-  let servico = null as (typeof avulsos)[number] | null;
+  const porte = porteVeiculo as VehicleSize;
+  let servico = null as (typeof todosServicos)[number] | null;
   let plano = null as (typeof planos)[PlanoId] | null;
-  let categoriaNome: string | null = null;
   let servicoPlanoNome: string | null = null;
+  let preco: number | null = null;
 
   if (tipoAtendimento === "avulso") {
-    servico = avulsos.find((s) => s.id === servicoId && !s.sobConsulta) ?? null;
+    servico = todosServicos.find((s) => s.id === servicoId && !s.requiresEvaluation) ?? null;
     if (!servico) {
       return NextResponse.json({ erro: "Serviço inválido" }, { status: 400 });
     }
+    preco = precoServico(servico, porte);
   } else {
     plano = planos[planoId as PlanoId] ?? null;
-    if (!plano || !plano.disponivel) {
+    if (!plano) {
       return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
     }
-    if (plano.categorias?.length) {
-      const cat = plano.categorias.find((c) => c.id === categoriaVeiculo);
-      if (!cat) {
-        return NextResponse.json({ erro: "Categoria de veículo inválida" }, { status: 400 });
-      }
-      categoriaNome = cat.id;
-    }
-    if (typeof servicoPlano !== "string" || !servicosPlanoDiamante.includes(servicoPlano)) {
+    if (typeof servicoPlano !== "string" || !servicosPorPlano[plano.id].includes(servicoPlano)) {
       return NextResponse.json({ erro: "Serviço do plano inválido" }, { status: 400 });
     }
     servicoPlanoNome = servicoPlano;
+    preco = plano.precos[porte];
   }
 
   const existente = await db
@@ -93,10 +92,10 @@ export async function POST(request: Request) {
       placa: typeof placa === "string" && placa.trim() ? placa.trim().toUpperCase() : null,
       tipoAtendimento,
       plano: plano?.id ?? null,
-      categoriaVeiculo: categoriaNome,
+      categoriaVeiculo: porte,
       servicoId: servico?.id ?? null,
       servicoNome: servico?.nome ?? servicoPlanoNome,
-      preco: servico?.preco != null ? servico.preco.toFixed(2) : null,
+      preco: preco != null ? preco.toFixed(2) : null,
       dia,
       horario,
     })

@@ -66,6 +66,21 @@ body {
   color: var(--color-text-secondary);
 }
 
+@keyframes preco-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.preco-fade {
+  animation: preco-fade 0.25s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

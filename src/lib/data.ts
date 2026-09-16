@@ -1,159 +1,186 @@
-export type PlanoId = "black" | "gold" | "diamante";
+export type VehicleSize = "P" | "G";
 
-export interface CategoriaVeiculo {
-  id: string;
+export interface VehicleSizeInfo {
+  id: VehicleSize;
   nome: string;
   descricao: string;
-  precoMensal: number;
 }
 
-export interface BeneficioPlano {
-  numero: string;
-  titulo: string;
-  descricao: string;
-}
+/** Porte do veículo: escolha única, global, que controla todos os preços da landing. */
+export const portesVeiculo: Record<VehicleSize, VehicleSizeInfo> = {
+  P: { id: "P", nome: "Hatch / Sedan", descricao: "Porte P" },
+  G: { id: "G", nome: "SUV / Pick-up", descricao: "Porte G" },
+};
+
+export const listaPortesVeiculo: VehicleSizeInfo[] = Object.values(portesVeiculo);
+
+export type PlanoId = "black" | "gold" | "diamante";
 
 export interface Plano {
   id: PlanoId;
   nome: string;
-  descricao: string;
-  /** false = detalhes ainda em definição com o cliente, não exibir preço/benefícios */
-  disponivel: boolean;
-  destaque?: boolean;
-  categorias?: CategoriaVeiculo[];
-  beneficios?: BeneficioPlano[];
+  headline: string;
+  precos: Record<VehicleSize, number>;
+  beneficios: string[];
+  cta: string;
+  badge?: string;
 }
 
-/**
- * A Pitstop 084 tem três níveis de assinatura. Black e Gold ainda não têm
- * preço/benefícios definidos com o cliente, por isso ficam com
- * `disponivel: false` (aparecem na landing como "em breve", sem inventar
- * valores). Diamante já tem dados reais.
- */
+/** Serviços incluídos em cada plano que podem ser agendados dentro do ciclo mensal. */
+export const servicosPorPlano: Record<PlanoId, string[]> = {
+  black: ["Lavagem Black"],
+  gold: ["Lavagem Gold", "Manutenção"],
+  diamante: ["Lavagem Diamante", "Lavagem Gold", "Manutenção"],
+};
+
 export const planos: Record<PlanoId, Plano> = {
   black: {
     id: "black",
     nome: "Black",
-    descricao: "Detalhes em definição com a Pitstop 084.",
-    disponivel: false,
+    headline: "Seu carro limpo. Sua rotina mais prática.",
+    precos: { P: 149.9, G: 199.9 },
+    beneficios: [
+      "1 lavagem semanal",
+      "Atendimento prioritário",
+      "10% OFF em todos os serviços adicionais",
+      "Mais praticidade para manter seu carro sempre impecável",
+    ],
+    cta: "Quero ser Black",
   },
   gold: {
     id: "gold",
     nome: "Gold",
-    descricao: "Detalhes em definição com a Pitstop 084.",
-    disponivel: false,
+    headline: "Cuidado premium, praticidade e exclusividade para o seu carro.",
+    precos: { P: 239.9, G: 269.9 },
+    beneficios: [
+      "1 Lavagem Gold mensal",
+      "4 Manutenções mensais",
+      "Atendimento prioritário",
+      "Serviço Leva & Busca",
+      "15% OFF em todos os serviços adicionais",
+    ],
+    cta: "Quero ser Gold",
   },
   diamante: {
     id: "diamante",
     nome: "Diamante",
-    descricao:
+    headline:
       "O cuidado mais completo da Pitstop 084 para quem não abre mão de ter o carro sempre impecável.",
-    disponivel: true,
-    destaque: true,
-    categorias: [
-      { id: "p", nome: "Carro P", descricao: "Hatch e Sedan", precoMensal: 329.9 },
-      { id: "g", nome: "Carro G", descricao: "SUV e Pick-up", precoMensal: 389.9 },
-    ],
+    precos: { P: 329.9, G: 389.9 },
     beneficios: [
-      {
-        numero: "01",
-        titulo: "1 lavagem Diamante mensal",
-        descricao:
-          "O tratamento mais completo da Pitstop 084, pensado para entregar o máximo em cuidado, proteção e acabamento.",
-      },
-      {
-        numero: "02",
-        titulo: "2 lavagens Gold mensais",
-        descricao: "Tratamento completo de conservação e proteção.",
-      },
-      {
-        numero: "03",
-        titulo: "Manutenção semanal ilimitada",
-        descricao: "Mantenha seu veículo sempre impecável, com manutenções durante todo o mês.",
-      },
-      {
-        numero: "04",
-        titulo: "Atendimento prioritário",
-        descricao: "Seu veículo tratado com prioridade na agenda.",
-      },
-      {
-        numero: "05",
-        titulo: "Serviço leva e busca",
-        descricao: "Mais comodidade: nós cuidamos do deslocamento do veículo.",
-      },
-      {
-        numero: "06",
-        titulo: "20% off em todos os serviços adicionais",
-        descricao: "",
-      },
+      "1 Lavagem Diamante mensal",
+      "2 Lavagens Gold mensais",
+      "Manutenção semanal ilimitada",
+      "Atendimento prioritário",
+      "Serviço Leva & Busca",
+      "20% OFF em todos os serviços adicionais",
     ],
+    cta: "Quero ser Diamante",
+    badge: "Experiência completa",
   },
 };
 
-export const listaPlanos: Plano[] = Object.values(planos);
+export const listaPlanos: Plano[] = [planos.black, planos.gold, planos.diamante];
 
 export const regraUtilizacaoPlanos =
-  "Os serviços inclusos no plano são válidos dentro do ciclo mensal vigente. Utilizações não realizadas dentro do período não acumulam para o próximo ciclo.";
+  "Os benefícios são válidos durante o ciclo mensal da assinatura e não acumulam para o mês seguinte.";
 
-/** Serviços que um assinante Diamante pode agendar dentro do próprio plano. */
-export const servicosPlanoDiamante = ["Lavagem Diamante", "Lavagem Gold", "Manutenção semanal"];
-
-export interface AvulsoServico {
+export interface Servico {
   id: string;
   nome: string;
-  descricao: string;
-  preco: number | null;
-  sobConsulta?: boolean;
+  descricao?: string;
   itens?: string[];
   duracao?: string;
   resultado?: string;
-  imagem?: string;
+  /** null = serviço mediante avaliação, sem preço fixo */
+  precos: Record<VehicleSize, number> | null;
+  requiresEvaluation: boolean;
   destaque?: boolean;
-  categoria?: string;
 }
 
-export const avulsos: AvulsoServico[] = [
+export function precoServico(servico: Servico, porte: VehicleSize): number | null {
+  return servico.precos ? servico.precos[porte] : null;
+}
+
+export const duchaPitstop: Servico = {
+  id: "ducha-pitstop",
+  nome: "Ducha Pitstop",
+  descricao: "Uma limpeza rápida para manter o veículo sempre limpo e apresentável.",
+  itens: [
+    "Lavagem externa completa",
+    "Secagem detalhada de toda a carroceria",
+    "Secagem das caixas de portas",
+    "Aplicação de pretinho nos pneus",
+  ],
+  duracao: "Aproximadamente 45 minutos",
+  resultado: "Veículo limpo, seco e com pneus renovados.",
+  precos: { P: 49.9, G: 49.9 },
+  requiresEvaluation: false,
+};
+
+/** Tabela oficial de serviços avulsos da Pitstop 084. */
+export const servicosAvulsos: Servico[] = [
   {
-    id: "ducha-pitstop",
-    nome: "Ducha Pitstop",
-    descricao: "Uma limpeza rápida para manter o veículo sempre limpo e apresentável.",
-    preco: 49.9,
-    itens: [
-      "Lavagem externa completa",
-      "Secagem detalhada de toda a carroceria",
-      "Secagem das caixas de portas",
-      "Aplicação de pretinho nos pneus",
-    ],
-    duracao: "Aproximadamente 45 minutos",
-    resultado: "Veículo limpo, seco e com pneus renovados.",
+    id: "descontaminacao-protecao-chassis",
+    nome: "Descontaminação e Proteção de Chassis",
+    precos: { P: 99.9, G: 149.9 },
+    requiresEvaluation: false,
+    destaque: true,
   },
   {
-    id: "lavagem-detalhada",
-    nome: "Lavagem detalhada",
-    descricao: "Externa + interna, com aspiração e hidratação de painel.",
-    preco: 89.9,
+    id: "descontaminacao-pintura",
+    nome: "Descontaminação de Pintura",
+    precos: { P: 99.9, G: 149.9 },
+    requiresEvaluation: false,
+    destaque: true,
+  },
+  {
+    id: "descontaminacao-protecao-motor",
+    nome: "Descontaminação e Proteção de Motor",
+    precos: { P: 119.9, G: 159.9 },
+    requiresEvaluation: false,
+  },
+  {
+    id: "protecao-pintura-selante",
+    nome: "Proteção de Pintura c/ Selante",
+    precos: { P: 49.9, G: 79.9 },
+    requiresEvaluation: false,
   },
   {
     id: "higienizacao-interna",
-    nome: "Higienização interna completa",
-    descricao: "Bancos, carpetes, teto e ar-condicionado.",
-    preco: 179.9,
+    nome: "Higienização Interna",
+    precos: { P: 249.9, G: 299.9 },
+    requiresEvaluation: false,
+    destaque: true,
   },
   {
-    id: "lavagem-motor",
-    nome: "Lavagem de motor",
-    descricao: "Limpeza e proteção do compartimento do motor.",
-    preco: null,
-    sobConsulta: true,
+    id: "restauracao-vitrificacao-plasticos",
+    nome: "Restauração e Vitrificação de Plásticos",
+    precos: null,
+    requiresEvaluation: true,
   },
   {
-    id: "polimento",
-    nome: "Polimento e proteção de pintura",
-    descricao: "Remoção de riscos leves e camada de proteção.",
-    preco: null,
-    sobConsulta: true,
+    id: "vitrificacao-pintura",
+    nome: "Vitrificação de Pintura",
+    precos: null,
+    requiresEvaluation: true,
+  },
+  {
+    id: "polimento-tecnico",
+    nome: "Polimento Técnico",
+    precos: null,
+    requiresEvaluation: true,
+  },
+  {
+    id: "polimento-detalhado",
+    nome: "Polimento Detalhado",
+    precos: null,
+    requiresEvaluation: true,
   },
 ];
+
+/** Todos os serviços agendáveis avulsamente (Ducha + tabela oficial). */
+export const todosServicos: Servico[] = [duchaPitstop, ...servicosAvulsos];
 
 export interface DuchaAddon {
   id: string;
@@ -182,11 +209,18 @@ export const enderecoPitstop = {
   nome: "Pitstop 084",
   linha1: "Av. Presidente Café Filho, 522",
   linha2: "Praia do Meio",
+  linha3: "Natal - RN",
 };
 
-export const linkComoChegar = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-  `${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}`
+const enderecoCompleto = `${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}, ${enderecoPitstop.linha3}`;
+
+export const linkComoChegar = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+  enderecoCompleto
 )}`;
+
+export const linkMapaEmbed = `https://www.google.com/maps?q=${encodeURIComponent(
+  enderecoCompleto
+)}&output=embed`;
 
 export const diasAgendamento = [
   "Segunda",

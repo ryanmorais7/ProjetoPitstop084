@@ -1,19 +1,22 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
-import { PlanoId, AvulsoServico } from "@/lib/data";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { PlanoId, Servico, VehicleSize } from "@/lib/data";
 
 export type TipoAtendimento = "avulso" | "assinatura";
+
+const STORAGE_KEY = "pitstop084:porte-veiculo";
 
 interface SelectionContextValue {
   tipoAtendimento: TipoAtendimento | null;
   setTipoAtendimento: (tipo: TipoAtendimento | null) => void;
   planoSelecionado: PlanoId | null;
   selecionarPlano: (id: PlanoId) => void;
-  categoriaVeiculo: string | null;
-  setCategoriaVeiculo: (id: string | null) => void;
-  avulsoSelecionado: AvulsoServico | null;
-  selecionarAvulso: (servico: AvulsoServico) => void;
+  /** Porte do veículo (P/G): escolha única, global, válida para toda a navegação atual. */
+  porteVeiculo: VehicleSize;
+  definirPorteVeiculo: (porte: VehicleSize) => void;
+  avulsoSelecionado: Servico | null;
+  selecionarAvulso: (servico: Servico) => void;
   reiniciarSelecao: () => void;
 }
 
@@ -22,8 +25,27 @@ const SelectionContext = createContext<SelectionContextValue | null>(null);
 export function SelectionProvider({ children }: { children: ReactNode }) {
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento | null>(null);
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoId | null>(null);
-  const [categoriaVeiculo, setCategoriaVeiculo] = useState<string | null>(null);
-  const [avulsoSelecionado, setAvulsoSelecionado] = useState<AvulsoServico | null>(null);
+  const [porteVeiculo, setPorteVeiculo] = useState<VehicleSize>("P");
+  const [avulsoSelecionado, setAvulsoSelecionado] = useState<Servico | null>(null);
+
+  useEffect(() => {
+    try {
+      const salvo = window.sessionStorage.getItem(STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hidrata o estado a partir do sessionStorage (sistema externo) uma única vez, no mount
+      if (salvo === "P" || salvo === "G") setPorteVeiculo(salvo);
+    } catch {
+      // sessionStorage indisponível (modo privado etc.), mantém o padrão "P"
+    }
+  }, []);
+
+  function definirPorteVeiculo(porte: VehicleSize) {
+    setPorteVeiculo(porte);
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, porte);
+    } catch {
+      // sessionStorage indisponível, seleção permanece só em memória
+    }
+  }
 
   return (
     <SelectionContext.Provider
@@ -32,14 +54,13 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
         setTipoAtendimento,
         planoSelecionado,
         selecionarPlano: setPlanoSelecionado,
-        categoriaVeiculo,
-        setCategoriaVeiculo,
+        porteVeiculo,
+        definirPorteVeiculo,
         avulsoSelecionado,
         selecionarAvulso: setAvulsoSelecionado,
         reiniciarSelecao: () => {
           setTipoAtendimento(null);
           setPlanoSelecionado(null);
-          setCategoriaVeiculo(null);
           setAvulsoSelecionado(null);
         },
       }}

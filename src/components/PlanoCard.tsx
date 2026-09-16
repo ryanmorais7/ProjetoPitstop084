@@ -1,70 +1,80 @@
-import { Plano } from "@/lib/data";
+import { Plano, VehicleSize } from "@/lib/data";
 import { formatarPreco } from "@/lib/format";
 
-export default function PlanoCard({ plano, onClick }: { plano: Plano; onClick?: () => void }) {
-  const destaque = plano.destaque && plano.disponivel;
-  const precoInicial = plano.categorias?.[0]?.precoMensal;
+const estilosPorPlano: Record<
+  Plano["id"],
+  { card: string; nome: string; preco: string; cta: string; check: string }
+> = {
+  black: {
+    card: "border border-white/15 bg-asphalt",
+    nome: "text-white",
+    preco: "text-white",
+    cta: "bg-gold text-asphalt hover:brightness-110",
+    check: "text-gold",
+  },
+  gold: {
+    card: "border-2 border-gold bg-panel",
+    nome: "text-gold",
+    preco: "text-gold",
+    cta: "bg-gold text-asphalt hover:brightness-110",
+    check: "text-gold",
+  },
+  diamante: {
+    card: "border border-black/10 bg-light",
+    nome: "text-light-text",
+    preco: "text-light-text",
+    cta: "bg-light-text text-light hover:opacity-90",
+    check: "text-gold",
+  },
+};
+
+export default function PlanoCard({
+  plano,
+  porteVeiculo,
+  onClick,
+}: {
+  plano: Plano;
+  porteVeiculo: VehicleSize;
+  onClick?: () => void;
+}) {
+  const estilo = estilosPorPlano[plano.id];
+  const preco = plano.precos[porteVeiculo];
+  const textoSecundario = plano.id === "diamante" ? "text-light-text-secondary" : "text-text-secondary";
 
   return (
-    <button
-      type="button"
-      onClick={plano.disponivel ? onClick : undefined}
-      disabled={!plano.disponivel}
-      style={
-        destaque
-          ? { background: "linear-gradient(160deg, #22190a 0%, #17181b 55%, #17181b 100%)" }
-          : undefined
-      }
-      className={`relative flex h-full flex-col rounded-sm p-6 text-left transition ${
-        destaque
-          ? "border-2 border-gold shadow-[0_0_50px_-12px_rgba(232,171,31,0.45)]"
-          : plano.disponivel
-          ? "border border-white/10 bg-panel hover:border-white/30"
-          : "border border-white/10 bg-panel opacity-60"
-      }`}
-    >
-      {destaque && (
+    <div className={`relative flex h-full flex-col rounded-sm p-6 ${estilo.card}`}>
+      {plano.badge && (
         <span className="mb-3 w-fit rounded-sm bg-gold px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-asphalt">
-          Mais exclusivo
+          {plano.badge}
         </span>
       )}
-      <h3 className="font-heading text-xl font-bold text-white">{plano.nome}</h3>
+      <h3 className={`font-heading text-2xl font-bold ${estilo.nome}`}>{plano.nome}</h3>
 
-      {plano.disponivel ? (
-        <p className="mt-1 font-mono text-2xl font-bold text-gold">
-          A partir de {formatarPreco(precoInicial ?? 0)}
-          <span className="text-sm font-normal text-text-secondary">/mês</span>
-        </p>
-      ) : (
-        <p className="mt-1 font-mono text-sm uppercase tracking-wide text-text-secondary">
-          Em breve
-        </p>
-      )}
+      <p key={porteVeiculo} className={`preco-fade mt-3 font-mono font-bold ${estilo.preco}`}>
+        <span className="text-3xl">{formatarPreco(preco)}</span>
+        <span className={`ml-1 text-sm font-normal ${textoSecundario}`}>/mês</span>
+      </p>
+      <p className={`mt-3 text-sm ${textoSecundario}`}>{plano.headline}</p>
 
-      <p className="mt-2 text-sm text-text-secondary">{plano.descricao}</p>
+      <ul className="mt-5 space-y-2 text-sm">
+        {plano.beneficios.map((item) => (
+          <li
+            key={item}
+            className={`flex items-start gap-2 ${plano.id === "diamante" ? "text-light-text" : "text-white"}`}
+          >
+            <span className={`mt-0.5 ${estilo.check}`}>⚡</span>
+            {item}
+          </li>
+        ))}
+      </ul>
 
-      {plano.disponivel && plano.beneficios && (
-        <ul className="mt-4 space-y-2 text-sm">
-          {plano.beneficios.slice(0, 4).map((item) => (
-            <li key={item.titulo} className="flex items-start gap-2 text-white">
-              <span className="mt-0.5 text-gold">✓</span>
-              {item.titulo}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <span
-        className={`mt-6 flex items-center justify-center gap-1 rounded-sm py-3 font-heading text-xs font-bold uppercase tracking-wide ${
-          !plano.disponivel
-            ? "border border-white/10 text-text-secondary"
-            : destaque
-            ? "bg-gold text-asphalt"
-            : "border border-gold text-gold"
-        }`}
+      <button
+        type="button"
+        onClick={onClick}
+        className={`mt-6 flex items-center justify-center gap-1 rounded-sm py-3 font-heading text-xs font-bold uppercase tracking-wide transition ${estilo.cta}`}
       >
-        {plano.disponivel ? "Ver detalhes" : "Em breve"}
-      </span>
-    </button>
+        {plano.cta}
+      </button>
+    </div>
   );
 }
