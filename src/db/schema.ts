@@ -11,6 +11,8 @@ export const agendamentos = pgTable("agendamentos", {
   categoriaVeiculo: text("categoria_veiculo"),
   servicoId: text("servico_id"),
   servicoNome: text("servico_nome"),
+  /** JSON de [{id, nome, preco}] com os cuidados adicionais escolhidos no configurador (preco: null = mediante avaliação). */
+  servicosAdicionais: text("servicos_adicionais"),
   preco: numeric("preco", { precision: 10, scale: 2 }),
   dia: text("dia").notNull(),
   horario: text("horario").notNull(),

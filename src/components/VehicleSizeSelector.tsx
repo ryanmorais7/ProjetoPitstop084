@@ -1,6 +1,6 @@
 "use client";
 
-import { listaPortesVeiculo, VehicleSize } from "@/lib/data";
+import { listaPortesVeiculo } from "@/lib/data";
 import { useSelection } from "@/context/SelectionContext";
 
 export function VehicleSizeSelector({ className = "" }: { className?: string }) {
@@ -20,8 +20,8 @@ export function VehicleSizeSelector({ className = "" }: { className?: string }) 
             aria-pressed={porteVeiculo === porte.id}
             className={`rounded-sm border px-5 py-3 text-left transition ${
               porteVeiculo === porte.id
-                ? "border-gold bg-panel"
-                : "border-white/10 bg-panel hover:border-white/30"
+                ? "border-gold bg-asphalt"
+                : "border-white/10 bg-asphalt hover:border-white/30"
             }`}
           >
             <span className="block font-heading text-sm font-bold">{porte.nome}</span>
@@ -31,36 +31,6 @@ export function VehicleSizeSelector({ className = "" }: { className?: string }) 
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-export function VehicleSizePill({ className = "" }: { className?: string }) {
-  const { porteVeiculo, definirPorteVeiculo } = useSelection();
-
-  function alternar(porte: VehicleSize) {
-    definirPorteVeiculo(porte);
-  }
-
-  return (
-    <div
-      className={`inline-flex items-center gap-1 rounded-full border border-white/10 bg-asphalt p-1 font-mono text-xs uppercase tracking-wide ${className}`}
-    >
-      {listaPortesVeiculo.map((porte) => (
-        <button
-          key={porte.id}
-          type="button"
-          onClick={() => alternar(porte.id)}
-          aria-pressed={porteVeiculo === porte.id}
-          className={`rounded-full px-3 py-1.5 transition ${
-            porteVeiculo === porte.id
-              ? "bg-gold text-asphalt"
-              : "text-text-secondary hover:text-text-primary"
-          }`}
-        >
-          {porte.nome}
-        </button>
-      ))}
     </div>
   );
 }

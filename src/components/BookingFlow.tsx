@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  todosServicos,
+  duchaPitstop,
   planos,
   listaPlanos,
   PlanoId,
@@ -14,15 +14,17 @@ import {
   horariosAgendamento,
   horariosIndisponiveisMock,
   linkWhatsapp,
-  Servico,
+  linkComoChegar,
 } from "@/lib/data";
+import { linkGoogleCalendar } from "@/lib/agenda";
 import { formatarPreco, formatarTelefone } from "@/lib/format";
 import { useSelection, TipoAtendimento } from "@/context/SelectionContext";
 import { scrollToId } from "@/lib/scroll";
 import PlanoCard from "./PlanoCard";
+import PitPass from "./PitPass";
 import Bolt from "./Bolt";
 
-type Etapa = "tipo" | "servico" | "plano" | "servicoPlano" | "horario" | "ficha" | "confirmacao";
+type Etapa = "tipo" | "plano" | "servicoPlano" | "horario" | "ficha" | "confirmacao";
 
 interface Slot {
   dia: string;
@@ -40,17 +42,15 @@ const diaAbreviado: Record<string, string> = {
 
 function etapaInicial(
   tipo: TipoAtendimento | null,
-  avulso: Servico | null,
   planoId: PlanoId | null,
   servicoPlano: string | null
 ): Etapa {
-  if (tipo === "avulso" && avulso) return avulso.requiresEvaluation ? "ficha" : "horario";
+  if (tipo === "avulso") return "horario";
   if (tipo === "assinatura" && planoId) {
     if (!servicoPlano) return "servicoPlano";
     return "horario";
   }
   if (tipo === "assinatura") return "plano";
-  if (tipo === "avulso") return "servico";
   return "tipo";
 }
 
@@ -58,8 +58,7 @@ export default function BookingFlow() {
   const {
     tipoAtendimento,
     setTipoAtendimento,
-    avulsoSelecionado,
-    selecionarAvulso,
+    avulsosSelecionados,
     planoSelecionado,
     selecionarPlano,
     porteVeiculo,
@@ -69,7 +68,7 @@ export default function BookingFlow() {
   const [servicoPlano, setServicoPlano] = useState<string | null>(null);
   const [reservaId, setReservaId] = useState<number | null>(null);
   const [etapa, setEtapa] = useState<Etapa>(() =>
-    etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado, servicoPlano)
+    etapaInicial(tipoAtendimento, planoSelecionado, servicoPlano)
   );
   const [diaSelecionadoDia, setDiaSelecionadoDia] = useState(diasAgendamento[0]);
   const [slotSelecionado, setSlotSelecionado] = useState<Slot | null>(null);
@@ -80,8 +79,6 @@ export default function BookingFlow() {
   const [ocupados, setOcupados] = useState<Set<string>>(new Set());
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [copiado, setCopiado] = useState(false);
-  const [avaliacaoSolicitada, setAvaliacaoSolicitada] = useState(false);
 
   useEffect(() => {
     fetch("/api/agendamentos")
@@ -93,23 +90,29 @@ export default function BookingFlow() {
   }, []);
 
   useEffect(() => {
-    const alvo = etapaInicial(tipoAtendimento, avulsoSelecionado, planoSelecionado, servicoPlano);
-    if (alvo !== "tipo" && (etapa === "tipo" || etapa === "servico" || etapa === "plano")) {
+    const alvo = etapaInicial(tipoAtendimento, planoSelecionado, servicoPlano);
+    if (alvo !== "tipo" && (etapa === "tipo" || etapa === "plano")) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza a etapa quando o serviço/plano é escolhido em outra seção da página
       setEtapa(alvo);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipoAtendimento, avulsoSelecionado, planoSelecionado]);
+  }, [tipoAtendimento, planoSelecionado]);
 
   const plano = planoSelecionado ? planos[planoSelecionado] : null;
   const porte = portesVeiculo[porteVeiculo];
-  const precoAvulso = avulsoSelecionado ? precoServico(avulsoSelecionado, porteVeiculo) : null;
+  const precoDucha = precoServico(duchaPitstop, porteVeiculo) ?? 0;
+  const adicionaisComPreco = avulsosSelecionados.filter((s) => s.precos);
+  const adicionaisAvaliacao = avulsosSelecionados.filter((s) => s.requiresEvaluation);
+  const totalAdicionais = adicionaisComPreco.reduce(
+    (soma, s) => soma + (precoServico(s, porteVeiculo) ?? 0),
+    0
+  );
+  const totalAvulso = precoDucha + totalAdicionais;
   const precoPlano = plano ? plano.precos[porteVeiculo] : null;
   const fichaValida = nome.trim().length > 1 && telefone.trim().length > 7 && carro.trim().length > 0;
 
   const indiceVisivel: Record<Etapa, number> = {
     tipo: 0,
-    servico: 1,
     plano: 1,
     servicoPlano: 1,
     horario: 2,
@@ -122,12 +125,7 @@ export default function BookingFlow() {
 
   function escolherTipo(tipo: TipoAtendimento) {
     setTipoAtendimento(tipo);
-    setEtapa(tipo === "avulso" ? "servico" : "plano");
-  }
-
-  function escolherServico(servico: Servico) {
-    selecionarAvulso(servico);
-    setEtapa(servico.requiresEvaluation ? "ficha" : "horario");
+    setEtapa(tipo === "avulso" ? "horario" : "plano");
   }
 
   function escolherPlano(id: PlanoId) {
@@ -170,7 +168,7 @@ export default function BookingFlow() {
           carro,
           placa,
           tipoAtendimento,
-          servicoId: avulsoSelecionado?.id,
+          avulsosIds: avulsosSelecionados.map((s) => s.id),
           planoId: planoSelecionado,
           porteVeiculo,
           servicoPlano,
@@ -196,55 +194,6 @@ export default function BookingFlow() {
     }
   }
 
-  function solicitarAvaliacao() {
-    if (!avulsoSelecionado) return;
-    const mensagem = [
-      `Olá! Quero solicitar uma avaliação para o serviço "${avulsoSelecionado.nome}".`,
-      `Veículo: ${porte.nome} (${carro})`,
-      `Nome: ${nome}`,
-      `WhatsApp: ${telefone}`,
-      placa ? `Placa: ${placa}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-    window.open(linkWhatsapp(mensagem), "_blank", "noopener,noreferrer");
-    setAvaliacaoSolicitada(true);
-    setEtapa("confirmacao");
-  }
-
-  function copiarCodigo(codigo: string) {
-    function marcarCopiado() {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    }
-
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(codigo).then(marcarCopiado, () => {
-        // permissão de clipboard negada pelo navegador, tenta o fallback abaixo
-        copiarComFallback(codigo, marcarCopiado);
-      });
-    } else {
-      copiarComFallback(codigo, marcarCopiado);
-    }
-  }
-
-  function copiarComFallback(codigo: string, aoCopiar: () => void) {
-    const campoTemporario = document.createElement("textarea");
-    campoTemporario.value = codigo;
-    campoTemporario.style.position = "fixed";
-    campoTemporario.style.opacity = "0";
-    document.body.appendChild(campoTemporario);
-    campoTemporario.select();
-    try {
-      document.execCommand("copy");
-      aoCopiar();
-    } catch {
-      // navegador não suporta cópia programática, usuário pode selecionar o código manualmente
-    } finally {
-      document.body.removeChild(campoTemporario);
-    }
-  }
-
   function novoAgendamento() {
     setSlotSelecionado(null);
     setNome("");
@@ -253,7 +202,6 @@ export default function BookingFlow() {
     setPlaca("");
     setServicoPlano(null);
     setReservaId(null);
-    setAvaliacaoSolicitada(false);
     setEtapa("tipo");
     reiniciarSelecao();
   }
@@ -270,7 +218,7 @@ export default function BookingFlow() {
             Seu Pitstop começa aqui.
           </h2>
           <p className="mt-3 text-light-text-secondary">
-            Escolha o serviço, o horário e deixe o resto com a gente.
+            Escolha o horário e deixe o resto com a gente.
           </p>
         </div>
 
@@ -310,9 +258,9 @@ export default function BookingFlow() {
                   onClick={() => escolherTipo("avulso")}
                   className="rounded-sm border border-white/10 bg-asphalt p-6 text-left transition hover:border-gold"
                 >
-                  <span className="font-heading text-lg font-bold">Serviço avulso</span>
+                  <span className="font-heading text-lg font-bold">Ducha Pitstop</span>
                   <p className="mt-2 text-sm text-text-secondary">
-                    Escolho um serviço agora, sem compromisso.
+                    Agendo agora, sem compromisso — dá pra adicionar cuidados na hora.
                   </p>
                 </button>
                 <button
@@ -328,47 +276,10 @@ export default function BookingFlow() {
               </div>
               <button
                 type="button"
-                onClick={() => scrollToId("planos")}
+                onClick={() => scrollToId("servicos")}
                 className="mt-4 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline"
               >
-                Ou conhecer os planos primeiro
-              </button>
-            </div>
-          )}
-
-          {etapa === "servico" && (
-            <div>
-              <h3 className="font-heading text-xl font-bold">Qual serviço você deseja?</h3>
-              <p className="mt-1 mb-6 text-sm text-text-secondary">
-                Veículo: <span className="text-gold">{porte.nome}</span>
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {todosServicos.map((servico) => {
-                  const preco = precoServico(servico, porteVeiculo);
-                  return (
-                    <button
-                      key={servico.id}
-                      type="button"
-                      onClick={() => escolherServico(servico)}
-                      className="flex flex-col rounded-sm border border-white/10 bg-asphalt p-5 text-left transition hover:border-gold"
-                    >
-                      <span className="font-heading text-base font-bold">{servico.nome}</span>
-                      {servico.descricao && (
-                        <span className="mt-1 text-sm text-text-secondary">{servico.descricao}</span>
-                      )}
-                      <span className="mt-4 font-mono text-sm text-gold">
-                        {preco != null ? formatarPreco(preco) : "Mediante avaliação"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={() => setEtapa("tipo")}
-                className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
-              >
-                Voltar
+                Ou montar meu Pitstop primeiro
               </button>
             </div>
           )}
@@ -431,10 +342,17 @@ export default function BookingFlow() {
             <div>
               <h3 className="font-heading text-xl font-bold">Quando você quer vir?</h3>
               <p className="mt-1 mb-6 text-sm text-text-secondary">
-                {tipoAtendimento === "avulso" && avulsoSelecionado && (
+                {tipoAtendimento === "avulso" && (
                   <>
-                    Agendando: <span className="text-gold">{avulsoSelecionado.nome}</span> ·{" "}
-                    {precoAvulso != null ? formatarPreco(precoAvulso) : "Mediante avaliação"}
+                    Agendando:{" "}
+                    <span className="text-gold">
+                      Ducha Pitstop
+                      {avulsosSelecionados.length > 0 &&
+                        ` + ${avulsosSelecionados.length} cuidado${
+                          avulsosSelecionados.length > 1 ? "s" : ""
+                        }`}
+                    </span>{" "}
+                    · {formatarPreco(totalAvulso)}
                   </>
                 )}
                 {tipoAtendimento === "assinatura" && plano && (
@@ -495,7 +413,9 @@ export default function BookingFlow() {
               <div className="mt-6 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setEtapa(tipoAtendimento === "assinatura" ? "servicoPlano" : "servico")}
+                  onClick={() =>
+                    setEtapa(tipoAtendimento === "assinatura" ? "servicoPlano" : "tipo")
+                  }
                   className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
                 >
                   Voltar
@@ -519,8 +439,7 @@ export default function BookingFlow() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!fichaValida) return;
-                if (avulsoSelecionado?.requiresEvaluation) solicitarAvaliacao();
-                else confirmarFicha();
+                confirmarFicha();
               }}
             >
               <h3 className="flex items-center gap-2 font-heading text-xl font-bold">
@@ -533,10 +452,14 @@ export default function BookingFlow() {
               <div className="mb-6 grid grid-cols-2 gap-x-4 gap-y-2 rounded-sm border border-white/10 bg-asphalt p-4 font-mono text-xs">
                 <SpecItem
                   label="Tipo"
-                  valor={tipoAtendimento === "assinatura" ? "Assinatura" : "Serviço avulso"}
+                  valor={tipoAtendimento === "assinatura" ? "Assinatura" : "Ducha Pitstop"}
                 />
-                {tipoAtendimento === "avulso" && avulsoSelecionado && (
-                  <SpecItem label="Serviço" valor={avulsoSelecionado.nome} />
+                {tipoAtendimento === "avulso" && (
+                  <SpecItem
+                    label="Serviços"
+                    valor={["Ducha Pitstop", ...avulsosSelecionados.map((s) => s.nome)].join(" + ")}
+                    wide
+                  />
                 )}
                 {tipoAtendimento === "assinatura" && plano && (
                   <>
@@ -601,7 +524,7 @@ export default function BookingFlow() {
               <div className="mt-6 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setEtapa(avulsoSelecionado?.requiresEvaluation ? "servico" : "horario")}
+                  onClick={() => setEtapa("horario")}
                   className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
                 >
                   Voltar
@@ -611,132 +534,102 @@ export default function BookingFlow() {
                   disabled={!fichaValida || enviando}
                   className="flex-1 rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {avulsoSelecionado?.requiresEvaluation
-                    ? "Solicitar avaliação"
-                    : enviando
-                    ? "Confirmando..."
-                    : "Confirmar agendamento"}
+                  {enviando ? "Confirmando..." : "Confirmar meu Pitstop"}
                 </button>
               </div>
             </form>
           )}
 
-          {etapa === "confirmacao" && avaliacaoSolicitada && (
-            <div className="text-center">
-              <p className="font-heading text-xs font-bold tracking-[0.2em] text-gold">PITSTOP 084 ⚡</p>
-              <h3 className="mt-1 font-heading text-2xl font-bold">Solicitação enviada.</h3>
-              <p className="mx-auto mt-3 max-w-sm text-sm text-text-secondary">
-                Nossa equipe vai avaliar {avulsoSelecionado?.nome.toLowerCase()} e retornar pelo
-                WhatsApp com o valor e o melhor horário.
-              </p>
-
-              <div className="mx-auto mt-6 max-w-sm space-y-2 rounded-sm bg-asphalt p-4 text-left font-mono text-sm">
-                <Linha label="Cliente" valor={nome} />
-                <Linha label="Veículo" valor={carro} />
-                {placa && <Linha label="Placa" valor={placa} />}
-                <Linha label="Porte" valor={porte.nome} />
-                {avulsoSelecionado && <Linha label="Serviço" valor={avulsoSelecionado.nome} />}
-              </div>
-
-              <div className="mx-auto mt-6 flex max-w-sm flex-col gap-3">
-                <a
-                  href={linkWhatsapp(
-                    `Olá! Acabei de solicitar uma avaliação na Pitstop para ${avulsoSelecionado?.nome}.`
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
-                >
-                  Falar com a Pitstop no WhatsApp
-                </a>
-                <button
-                  onClick={novoAgendamento}
-                  className="rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
-                >
-                  Fazer novo agendamento
-                </button>
-              </div>
-            </div>
-          )}
-
-          {etapa === "confirmacao" && !avaliacaoSolicitada && slotSelecionado && reservaId && (
+          {etapa === "confirmacao" && slotSelecionado && reservaId && (
             <div className="text-center">
               {(() => {
-                const codigo = `PIT-084-${String(reservaId).padStart(6, "0")}`;
-                const barras = codigo
-                  .split("")
-                  .map((c) => (c.charCodeAt(0) % 3) + 1);
+                const codigo = `P084-${String(reservaId).padStart(4, "0")}`;
+                const servicosPitpass =
+                  tipoAtendimento === "avulso"
+                    ? [
+                        "Ducha Pitstop",
+                        ...avulsosSelecionados.filter((s) => !s.requiresEvaluation).map((s) => s.nome),
+                      ]
+                    : [plano?.nome, servicoPlano].filter((v): v is string => Boolean(v));
+                const selo = tipoAtendimento === "avulso" ? "AGENDAMENTO" : plano?.nome.toUpperCase() ?? "";
+                const mensagemWhats = `Olá! Acabei de agendar na Pitstop pra ${slotSelecionado.dia} às ${slotSelecionado.hora}. Meu PitPass: #${codigo}`;
+                const linkCalendario = linkGoogleCalendar({
+                  diaSemana: slotSelecionado.dia,
+                  horario: slotSelecionado.hora,
+                  titulo: "Pitstop 084",
+                  detalhes: servicosPitpass.join(" + "),
+                });
+
                 return (
                   <>
                     <p className="font-heading text-xs font-bold tracking-[0.2em] text-gold">
-                      PITSTOP 084 ⚡
+                      ✓ AGENDAMENTO CONFIRMADO
                     </p>
-                    <h3 className="mt-1 font-heading text-2xl font-bold">
-                      Seu PitPass está pronto.
-                    </h3>
+                    <h3 className="mt-1 font-heading text-2xl font-bold">Seu Pitstop está marcado.</h3>
+                    <p className="mt-2 text-sm text-text-secondary">Agora deixa o cuidado com a gente.</p>
 
-                    <div className="mx-auto mt-6 max-w-sm rounded-sm border-2 border-gold bg-asphalt p-6">
-                      <div className="mb-4 flex h-10 items-end justify-center gap-[3px]" aria-hidden="true">
-                        {barras.map((largura, i) => (
-                          <span
-                            key={i}
-                            style={{ width: `${largura * 2}px` }}
-                            className="h-full bg-gold/70"
-                          />
-                        ))}
+                    <div className="mt-6">
+                      <PitPass
+                        selo={selo}
+                        planoId={plano?.id}
+                        carro={carro}
+                        porteNome={porte.nome}
+                        diaSemana={slotSelecionado.dia}
+                        horario={slotSelecionado.hora}
+                        servicos={servicosPitpass}
+                        codigo={codigo}
+                      />
+                    </div>
+
+                    {tipoAtendimento === "avulso" && adicionaisAvaliacao.length > 0 && (
+                      <div className="mx-auto mt-4 max-w-sm rounded-sm border border-white/10 bg-panel p-4 text-left text-sm">
+                        <p className="text-text-secondary">
+                          Você também pediu avaliação para:{" "}
+                          <span className="text-white">
+                            {adicionaisAvaliacao.map((s) => s.nome).join(", ")}
+                          </span>
+                          . Nossa equipe retorna pelo WhatsApp com o valor.
+                        </p>
+                        <a
+                          href={linkWhatsapp(
+                            `Olá! Acabei de agendar na Pitstop e também quero uma avaliação para: ${adicionaisAvaliacao
+                              .map((s) => s.nome)
+                              .join(", ")}.`
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-block font-mono text-xs uppercase tracking-wide text-gold underline-offset-4 hover:underline"
+                        >
+                          Pedir avaliação no WhatsApp
+                        </a>
                       </div>
-                      <p className="font-mono text-2xl font-bold tracking-[0.15em] text-white">
-                        {codigo}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => copiarCodigo(codigo)}
-                        className="mt-3 font-mono text-xs uppercase tracking-wide text-gold underline-offset-4 hover:underline"
-                      >
-                        {copiado ? "Copiado!" : "Copiar código"}
-                      </button>
-                    </div>
-
-                    <div className="mx-auto mt-6 max-w-sm space-y-2 rounded-sm bg-asphalt p-4 text-left font-mono text-sm">
-                      <Linha label="Cliente" valor={nome} />
-                      <Linha label="Veículo" valor={carro} />
-                      {placa && <Linha label="Placa" valor={placa} />}
-                      <Linha label="Porte" valor={porte.nome} />
-                      {tipoAtendimento === "avulso" && avulsoSelecionado && (
-                        <Linha label="Serviço" valor={avulsoSelecionado.nome} />
-                      )}
-                      {tipoAtendimento === "assinatura" && plano && (
-                        <>
-                          <Linha label="Plano" valor={plano.nome} />
-                          {servicoPlano && <Linha label="Serviço" valor={servicoPlano} />}
-                        </>
-                      )}
-                      <Linha label="Horário" valor={`${slotSelecionado.dia}, ${slotSelecionado.hora}`} />
-                    </div>
-
-                    <p className="mt-4 text-xs text-text-secondary">
-                      Apresente seu PitPass na chegada.
-                    </p>
+                    )}
 
                     <div className="mx-auto mt-6 flex max-w-sm flex-col gap-3">
                       <a
-                        href={linkWhatsapp(
-                          `Olá! Acabei de agendar na Pitstop pra ${slotSelecionado.dia} às ${slotSelecionado.hora}. Meu PitPass: ${codigo}`
-                        )}
+                        href={linkCalendario}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
                       >
-                        Falar com a Pitstop no WhatsApp
+                        Adicionar à agenda
                       </a>
-                      <button
-                        type="button"
-                        disabled
-                        title="Em breve"
-                        className="cursor-not-allowed rounded-sm border border-white/10 py-3 font-heading text-sm font-semibold tracking-wide text-text-secondary opacity-50"
+                      <a
+                        href={linkComoChegar}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
                       >
-                        Adicionar ao calendário
-                      </button>
+                        Como chegar
+                      </a>
+                      <a
+                        href={linkWhatsapp(mensagemWhats)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+                      >
+                        Falar com a Pitstop
+                      </a>
                       <button
                         onClick={novoAgendamento}
                         className="rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
@@ -755,18 +648,9 @@ export default function BookingFlow() {
   );
 }
 
-function Linha({ label, valor }: { label: string; valor: string }) {
+function SpecItem({ label, valor, wide }: { label: string; valor: string; wide?: boolean }) {
   return (
-    <div className="flex justify-between gap-4">
-      <span className="text-text-secondary">{label}</span>
-      <span className="text-right text-text-primary">{valor}</span>
-    </div>
-  );
-}
-
-function SpecItem({ label, valor }: { label: string; valor: string }) {
-  return (
-    <div>
+    <div className={wide ? "col-span-2" : undefined}>
       <span className="block text-text-secondary uppercase tracking-wide">{label}</span>
       <span className="text-text-primary">{valor}</span>
     </div>

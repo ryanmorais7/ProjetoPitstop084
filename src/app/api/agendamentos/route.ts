@@ -3,7 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos } from "@/db/schema";
 import {
-  todosServicos,
+  duchaPitstop,
+  servicosAvulsos,
   planos,
   PlanoId,
   servicosPorPlano,
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     carro,
     placa,
     tipoAtendimento,
-    servicoId,
+    avulsosIds,
     planoId,
     porteVeiculo,
     servicoPlano,
@@ -50,17 +51,30 @@ export async function POST(request: Request) {
   }
 
   const porte = porteVeiculo as VehicleSize;
-  let servico = null as (typeof todosServicos)[number] | null;
   let plano = null as (typeof planos)[PlanoId] | null;
   let servicoPlanoNome: string | null = null;
   let preco: number | null = null;
+  let servicosAdicionaisJson: string | null = null;
 
   if (tipoAtendimento === "avulso") {
-    servico = todosServicos.find((s) => s.id === servicoId && !s.requiresEvaluation) ?? null;
-    if (!servico) {
-      return NextResponse.json({ erro: "Serviço inválido" }, { status: 400 });
+    if (!Array.isArray(avulsosIds) || avulsosIds.some((id) => typeof id !== "string")) {
+      return NextResponse.json({ erro: "Adicionais inválidos" }, { status: 400 });
     }
-    preco = precoServico(servico, porte);
+    const adicionais = (avulsosIds as string[]).map((id) =>
+      servicosAvulsos.find((s) => s.id === id)
+    );
+    if (adicionais.some((s) => !s)) {
+      return NextResponse.json({ erro: "Adicional inválido" }, { status: 400 });
+    }
+    const validos = adicionais.filter((s): s is NonNullable<typeof s> => Boolean(s));
+    const totalAdicionais = validos.reduce(
+      (soma, s) => soma + (precoServico(s, porte) ?? 0),
+      0
+    );
+    preco = (precoServico(duchaPitstop, porte) ?? 0) + totalAdicionais;
+    servicosAdicionaisJson = JSON.stringify(
+      validos.map((s) => ({ id: s.id, nome: s.nome, preco: precoServico(s, porte) }))
+    );
   } else {
     plano = planos[planoId as PlanoId] ?? null;
     if (!plano) {
@@ -93,8 +107,9 @@ export async function POST(request: Request) {
       tipoAtendimento,
       plano: plano?.id ?? null,
       categoriaVeiculo: porte,
-      servicoId: servico?.id ?? null,
-      servicoNome: servico?.nome ?? servicoPlanoNome,
+      servicoId: tipoAtendimento === "avulso" ? duchaPitstop.id : null,
+      servicoNome: tipoAtendimento === "avulso" ? duchaPitstop.nome : servicoPlanoNome,
+      servicosAdicionais: servicosAdicionaisJson,
       preco: preco != null ? preco.toFixed(2) : null,
       dia,
       horario,

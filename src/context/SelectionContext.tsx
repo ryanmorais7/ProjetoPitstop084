@@ -15,8 +15,9 @@ interface SelectionContextValue {
   /** Porte do veículo (P/G): escolha única, global, válida para toda a navegação atual. */
   porteVeiculo: VehicleSize;
   definirPorteVeiculo: (porte: VehicleSize) => void;
-  avulsoSelecionado: Servico | null;
-  selecionarAvulso: (servico: Servico) => void;
+  /** Cuidados adicionais escolhidos no configurador "Monte seu Pitstop" (a Ducha é sempre a base implícita, nunca entra aqui). */
+  avulsosSelecionados: Servico[];
+  alternarAvulso: (servico: Servico) => void;
   reiniciarSelecao: () => void;
 }
 
@@ -26,7 +27,7 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento | null>(null);
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoId | null>(null);
   const [porteVeiculo, setPorteVeiculo] = useState<VehicleSize>("P");
-  const [avulsoSelecionado, setAvulsoSelecionado] = useState<Servico | null>(null);
+  const [avulsosSelecionados, setAvulsosSelecionados] = useState<Servico[]>([]);
 
   useEffect(() => {
     try {
@@ -47,6 +48,14 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function alternarAvulso(servico: Servico) {
+    setAvulsosSelecionados((atual) =>
+      atual.some((s) => s.id === servico.id)
+        ? atual.filter((s) => s.id !== servico.id)
+        : [...atual, servico]
+    );
+  }
+
   return (
     <SelectionContext.Provider
       value={{
@@ -56,12 +65,12 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
         selecionarPlano: setPlanoSelecionado,
         porteVeiculo,
         definirPorteVeiculo,
-        avulsoSelecionado,
-        selecionarAvulso: setAvulsoSelecionado,
+        avulsosSelecionados,
+        alternarAvulso,
         reiniciarSelecao: () => {
           setTipoAtendimento(null);
           setPlanoSelecionado(null);
-          setAvulsoSelecionado(null);
+          setAvulsosSelecionados([]);
         },
       }}
     >

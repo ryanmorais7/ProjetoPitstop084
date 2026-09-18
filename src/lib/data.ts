@@ -85,10 +85,21 @@ export const listaPlanos: Plano[] = [planos.black, planos.gold, planos.diamante]
 export const regraUtilizacaoPlanos =
   "Os benefícios são válidos durante o ciclo mensal da assinatura e não acumulam para o mês seguinte.";
 
+export type CategoriaCuidado = "limpeza" | "protecao" | "estetica";
+
+export const categoriasCuidado: Record<CategoriaCuidado, string> = {
+  limpeza: "Limpeza profunda",
+  protecao: "Proteção",
+  estetica: "Estética avançada",
+};
+
 export interface Servico {
   id: string;
   nome: string;
   descricao?: string;
+  /** Descrição curta (uma linha), usada nos cards do configurador "Monte seu Pitstop". */
+  shortDescription?: string;
+  categoria?: CategoriaCuidado;
   itens?: string[];
   duracao?: string;
   resultado?: string;
@@ -118,88 +129,90 @@ export const duchaPitstop: Servico = {
   requiresEvaluation: false,
 };
 
-/** Tabela oficial de serviços avulsos da Pitstop 084. */
+/** Tabela oficial de serviços avulsos da Pitstop 084 — cuidados adicionais do configurador "Monte seu Pitstop". */
 export const servicosAvulsos: Servico[] = [
   {
-    id: "descontaminacao-protecao-chassis",
-    nome: "Descontaminação e Proteção de Chassis",
+    id: "descontaminacao-pintura",
+    nome: "Descontaminação de Pintura",
+    shortDescription: "Remove contaminantes aderidos à superfície.",
+    categoria: "limpeza",
     precos: { P: 99.9, G: 149.9 },
     requiresEvaluation: false,
     destaque: true,
   },
   {
-    id: "descontaminacao-pintura",
-    nome: "Descontaminação de Pintura",
-    precos: { P: 99.9, G: 149.9 },
+    id: "higienizacao-interna",
+    nome: "Higienização Interna",
+    shortDescription: "Limpeza profunda para renovar o interior.",
+    categoria: "limpeza",
+    precos: { P: 249.9, G: 299.9 },
+    requiresEvaluation: false,
+    destaque: true,
+  },
+  {
+    id: "protecao-pintura-selante",
+    nome: "Proteção de Pintura c/ Selante",
+    shortDescription: "Proteção e acabamento para a pintura.",
+    categoria: "protecao",
+    precos: { P: 49.9, G: 79.9 },
     requiresEvaluation: false,
     destaque: true,
   },
   {
     id: "descontaminacao-protecao-motor",
     nome: "Descontaminação e Proteção de Motor",
+    shortDescription: "Limpeza e proteção cuidadosa do compartimento.",
+    categoria: "protecao",
     precos: { P: 119.9, G: 159.9 },
-    requiresEvaluation: false,
-  },
-  {
-    id: "protecao-pintura-selante",
-    nome: "Proteção de Pintura c/ Selante",
-    precos: { P: 49.9, G: 79.9 },
-    requiresEvaluation: false,
-  },
-  {
-    id: "higienizacao-interna",
-    nome: "Higienização Interna",
-    precos: { P: 249.9, G: 299.9 },
     requiresEvaluation: false,
     destaque: true,
   },
   {
+    id: "descontaminacao-protecao-chassis",
+    nome: "Descontaminação e Proteção de Chassis",
+    shortDescription: "Remove sujeira pesada e protege a parte inferior do carro.",
+    categoria: "protecao",
+    precos: { P: 99.9, G: 149.9 },
+    requiresEvaluation: false,
+  },
+  {
     id: "restauracao-vitrificacao-plasticos",
     nome: "Restauração e Vitrificação de Plásticos",
+    shortDescription: "Renova e protege plásticos externos desgastados.",
+    categoria: "estetica",
     precos: null,
     requiresEvaluation: true,
   },
   {
     id: "vitrificacao-pintura",
     nome: "Vitrificação de Pintura",
+    shortDescription: "Proteção de longa duração com brilho intenso.",
+    categoria: "estetica",
     precos: null,
     requiresEvaluation: true,
   },
   {
     id: "polimento-tecnico",
     nome: "Polimento Técnico",
+    shortDescription: "Correção de imperfeições leves na pintura.",
+    categoria: "estetica",
     precos: null,
     requiresEvaluation: true,
   },
   {
     id: "polimento-detalhado",
     nome: "Polimento Detalhado",
+    shortDescription: "Acabamento refinado para um brilho de showroom.",
+    categoria: "estetica",
     precos: null,
     requiresEvaluation: true,
   },
 ];
 
-/** Todos os serviços agendáveis avulsamente (Ducha + tabela oficial). */
-export const todosServicos: Servico[] = [duchaPitstop, ...servicosAvulsos];
-
-export interface DuchaAddon {
-  id: string;
-  nome: string;
-  /** null = preço ainda não definido com o cliente */
-  preco: number | null;
-}
-
-export const duchaAddons: DuchaAddon[] = [
-  { id: "pretinho", nome: "Pretinho", preco: null },
-  { id: "cera", nome: "Cera", preco: null },
-  { id: "protetor-plasticos", nome: "Protetor de plásticos", preco: null },
-  { id: "protecao-chassi", nome: "Proteção de chassi", preco: null },
-];
-
 /** Rótulos genéricos das etapas do agendamento, usados no indicador de progresso. */
 export const etapasAgendamento = ["Como agendar", "Serviço", "Horário", "Ficha técnica", "PitPass"];
 
-export const whatsappNumero = "5511999999999";
+export const whatsappNumero = "5584987554603";
 
 export function linkWhatsapp(mensagem: string) {
   return `https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensagem)}`;
