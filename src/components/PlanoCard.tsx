@@ -1,5 +1,5 @@
 import { Plano, VehicleSize } from "@/lib/data";
-import { formatarPreco } from "@/lib/format";
+import { formatarPrecoPartes } from "@/lib/format";
 
 const estilosPorPlano: Record<
   Plano["id"],
@@ -39,6 +39,7 @@ export default function PlanoCard({
 }) {
   const estilo = estilosPorPlano[plano.id];
   const preco = plano.precos[porteVeiculo];
+  const { moeda, valor } = formatarPrecoPartes(preco);
   const textoSecundario = plano.id === "diamante" ? "text-light-text-secondary" : "text-text-secondary";
 
   return (
@@ -50,9 +51,13 @@ export default function PlanoCard({
       )}
       <h3 className={`font-heading text-2xl font-bold ${estilo.nome}`}>{plano.nome}</h3>
 
-      <p key={porteVeiculo} className={`preco-fade mt-3 font-mono font-bold ${estilo.preco}`}>
-        <span className="text-3xl">{formatarPreco(preco)}</span>
-        <span className={`ml-1 text-sm font-normal ${textoSecundario}`}>/mês</span>
+      <p
+        key={porteVeiculo}
+        className={`preco-fade mt-3 flex flex-wrap items-baseline gap-x-1 font-mono font-bold ${estilo.preco}`}
+      >
+        <span className="text-sm font-semibold">{moeda}</span>
+        <span className="text-[clamp(1.5rem,4.5vw,1.875rem)] leading-none">{valor}</span>
+        <span className={`whitespace-nowrap text-sm font-normal ${textoSecundario}`}>/mês</span>
       </p>
       <p className={`mt-3 text-sm ${textoSecundario}`}>{plano.headline}</p>
 
@@ -71,7 +76,7 @@ export default function PlanoCard({
       <button
         type="button"
         onClick={onClick}
-        className={`mt-6 flex items-center justify-center gap-1 rounded-sm py-3 font-heading text-xs font-bold uppercase tracking-wide transition ${estilo.cta}`}
+        className={`mt-auto flex items-center justify-center gap-1 rounded-sm py-3 font-heading text-xs font-bold uppercase tracking-wide transition ${estilo.cta}`}
       >
         {plano.cta}
       </button>

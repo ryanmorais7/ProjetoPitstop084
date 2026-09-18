@@ -235,14 +235,8 @@ export const linkMapaEmbed = `https://www.google.com/maps?q=${encodeURIComponent
   enderecoCompleto
 )}&output=embed`;
 
-export const diasAgendamento = [
-  "Segunda",
-  "Terça",
-  "Quarta",
-  "Quinta",
-  "Sexta",
-  "Sábado",
-];
+/** A Pitstop 084 não atende aos domingos (índice 0 de Date.getDay()). */
+export const diaFechado = 0;
 
 export const horariosAgendamento = [
   "08:00",
@@ -256,15 +250,10 @@ export const horariosAgendamento = [
   "17:00",
 ];
 
-export const horariosIndisponiveisMock = new Set<string>([
-  "Segunda-09:00",
-  "Segunda-14:00",
-  "Terça-08:00",
-  "Quarta-11:00",
-  "Quarta-15:00",
-  "Quinta-16:00",
-  "Sexta-08:00",
-  "Sexta-13:00",
-  "Sábado-10:00",
-  "Sábado-17:00",
-]);
+/** Descrição curta de cada benefício agendável dos planos, para o passo "o que você quer usar?". */
+export const beneficiosAgendaveis: Record<string, string> = {
+  "Lavagem Black": "Seu cuidado recorrente para manter o carro limpo e apresentável durante a semana.",
+  "Lavagem Gold": "Tratamento completo de conservação e proteção do veículo.",
+  "Lavagem Diamante": "O cuidado mais completo da Pitstop 084 para o seu carro.",
+  "Manutenção": "Cuidado periódico para manter o padrão da sua lavagem em dia.",
+};

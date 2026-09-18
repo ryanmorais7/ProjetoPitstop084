@@ -15,6 +15,8 @@ interface SelectionContextValue {
   /** Porte do veículo (P/G): escolha única, global, válida para toda a navegação atual. */
   porteVeiculo: VehicleSize;
   definirPorteVeiculo: (porte: VehicleSize) => void;
+  /** true assim que o usuário escolhe o porte explicitamente (não apenas o padrão "P" inicial). */
+  porteDefinidoPeloUsuario: boolean;
   /** Cuidados adicionais escolhidos no configurador "Monte seu Pitstop" (a Ducha é sempre a base implícita, nunca entra aqui). */
   avulsosSelecionados: Servico[];
   alternarAvulso: (servico: Servico) => void;
@@ -27,13 +29,17 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento | null>(null);
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoId | null>(null);
   const [porteVeiculo, setPorteVeiculo] = useState<VehicleSize>("P");
+  const [porteDefinidoPeloUsuario, setPorteDefinidoPeloUsuario] = useState(false);
   const [avulsosSelecionados, setAvulsosSelecionados] = useState<Servico[]>([]);
 
   useEffect(() => {
     try {
       const salvo = window.sessionStorage.getItem(STORAGE_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hidrata o estado a partir do sessionStorage (sistema externo) uma única vez, no mount
-      if (salvo === "P" || salvo === "G") setPorteVeiculo(salvo);
+      if (salvo === "P" || salvo === "G") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hidrata o estado a partir do sessionStorage (sistema externo) uma única vez, no mount
+        setPorteVeiculo(salvo);
+        setPorteDefinidoPeloUsuario(true);
+      }
     } catch {
       // sessionStorage indisponível (modo privado etc.), mantém o padrão "P"
     }
@@ -41,6 +47,7 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
 
   function definirPorteVeiculo(porte: VehicleSize) {
     setPorteVeiculo(porte);
+    setPorteDefinidoPeloUsuario(true);
     try {
       window.sessionStorage.setItem(STORAGE_KEY, porte);
     } catch {
@@ -65,6 +72,7 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
         selecionarPlano: setPlanoSelecionado,
         porteVeiculo,
         definirPorteVeiculo,
+        porteDefinidoPeloUsuario,
         avulsosSelecionados,
         alternarAvulso,
         reiniciarSelecao: () => {

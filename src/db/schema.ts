@@ -14,6 +14,7 @@ export const agendamentos = pgTable("agendamentos", {
   /** JSON de [{id, nome, preco}] com os cuidados adicionais escolhidos no configurador (preco: null = mediante avaliação). */
   servicosAdicionais: text("servicos_adicionais"),
   preco: numeric("preco", { precision: 10, scale: 2 }),
+  /** Data real do agendamento, formato ISO "YYYY-MM-DD" (não é mais nome de dia da semana). */
   dia: text("dia").notNull(),
   horario: text("horario").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

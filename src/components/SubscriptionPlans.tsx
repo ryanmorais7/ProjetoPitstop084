@@ -19,7 +19,7 @@ export default function SubscriptionPlans() {
 
   return (
     <section id="planos" className="bg-surface px-6 py-24">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-6xl">
         <Reveal>
           <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
             <Bolt className="h-3.5 w-3.5 text-gold" />
@@ -38,9 +38,13 @@ export default function SubscriptionPlans() {
           <VehicleSizeSelector className="mt-10 max-w-xl" />
         </Reveal>
 
-        <div className="mt-8 grid gap-6 sm:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {listaPlanos.map((plano, i) => (
-            <Reveal key={plano.id} delayMs={i * 80}>
+            <Reveal
+              key={plano.id}
+              delayMs={i * 80}
+              className="sm:last:col-span-2 sm:last:mx-auto sm:last:max-w-sm lg:last:col-span-1 lg:last:mx-0 lg:last:max-w-none"
+            >
               <PlanoCard plano={plano} porteVeiculo={porteVeiculo} onClick={() => assinar(plano.id)} />
             </Reveal>
           ))}

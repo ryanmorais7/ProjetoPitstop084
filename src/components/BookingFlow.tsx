@@ -1,56 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   duchaPitstop,
   planos,
   listaPlanos,
+  listaPortesVeiculo,
   PlanoId,
   servicosPorPlano,
+  beneficiosAgendaveis,
   portesVeiculo,
   precoServico,
   etapasAgendamento,
-  diasAgendamento,
   horariosAgendamento,
-  horariosIndisponiveisMock,
   linkWhatsapp,
   linkComoChegar,
 } from "@/lib/data";
-import { linkGoogleCalendar } from "@/lib/agenda";
+import { proximasDatasUteis, paraIso, formatarDataCurta, linkGoogleCalendar } from "@/lib/agenda";
 import { formatarPreco, formatarTelefone } from "@/lib/format";
 import { useSelection, TipoAtendimento } from "@/context/SelectionContext";
 import { scrollToId } from "@/lib/scroll";
-import PlanoCard from "./PlanoCard";
+import DateTimePicker from "./DateTimePicker";
 import PitPass from "./PitPass";
 import Bolt from "./Bolt";
 
-type Etapa = "tipo" | "plano" | "servicoPlano" | "horario" | "ficha" | "confirmacao";
+type Etapa = "tipo" | "plano" | "porte" | "beneficio" | "horario" | "ficha" | "confirmacao";
 
 interface Slot {
   dia: string;
   hora: string;
 }
 
-const diaAbreviado: Record<string, string> = {
-  Segunda: "Seg",
-  Terça: "Ter",
-  Quarta: "Qua",
-  Quinta: "Qui",
-  Sexta: "Sex",
-  Sábado: "Sáb",
-};
-
 function etapaInicial(
   tipo: TipoAtendimento | null,
   planoId: PlanoId | null,
-  servicoPlano: string | null
+  beneficio: string | null,
+  porteDefinido: boolean
 ): Etapa {
   if (tipo === "avulso") return "horario";
-  if (tipo === "assinatura" && planoId) {
-    if (!servicoPlano) return "servicoPlano";
+  if (tipo === "assinatura") {
+    if (!planoId) return "plano";
+    if (!porteDefinido) return "porte";
+    if (!beneficio) return "beneficio";
     return "horario";
   }
-  if (tipo === "assinatura") return "plano";
   return "tipo";
 }
 
@@ -62,15 +55,18 @@ export default function BookingFlow() {
     planoSelecionado,
     selecionarPlano,
     porteVeiculo,
+    definirPorteVeiculo,
+    porteDefinidoPeloUsuario,
     reiniciarSelecao,
   } = useSelection();
 
-  const [servicoPlano, setServicoPlano] = useState<string | null>(null);
+  const [beneficioSelecionado, setBeneficioSelecionado] = useState<string | null>(null);
   const [reservaId, setReservaId] = useState<number | null>(null);
   const [etapa, setEtapa] = useState<Etapa>(() =>
-    etapaInicial(tipoAtendimento, planoSelecionado, servicoPlano)
+    etapaInicial(tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario)
   );
-  const [diaSelecionadoDia, setDiaSelecionadoDia] = useState(diasAgendamento[0]);
+  const datasRapidas = useMemo(() => proximasDatasUteis(6), []);
+  const [dataSelecionadaIso, setDataSelecionadaIso] = useState(() => paraIso(datasRapidas[0]));
   const [slotSelecionado, setSlotSelecionado] = useState<Slot | null>(null);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -90,13 +86,23 @@ export default function BookingFlow() {
   }, []);
 
   useEffect(() => {
-    const alvo = etapaInicial(tipoAtendimento, planoSelecionado, servicoPlano);
-    if (alvo !== "tipo" && (etapa === "tipo" || etapa === "plano")) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza a etapa quando o serviço/plano é escolhido em outra seção da página
+    if (tipoAtendimento === "assinatura" && planoSelecionado) {
+      const beneficios = servicosPorPlano[planoSelecionado];
+      if (beneficios.length === 1 && !beneficioSelecionado) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- planos com um único benefício não precisam de uma tela de escolha
+        setBeneficioSelecionado(beneficios[0]);
+        return;
+      }
+    }
+    const alvo = etapaInicial(tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario);
+    if (
+      alvo !== "tipo" &&
+      (etapa === "tipo" || etapa === "plano" || etapa === "porte" || etapa === "beneficio")
+    ) {
       setEtapa(alvo);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipoAtendimento, planoSelecionado]);
+  }, [tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario]);
 
   const plano = planoSelecionado ? planos[planoSelecionado] : null;
   const porte = portesVeiculo[porteVeiculo];
@@ -108,13 +114,13 @@ export default function BookingFlow() {
     0
   );
   const totalAvulso = precoDucha + totalAdicionais;
-  const precoPlano = plano ? plano.precos[porteVeiculo] : null;
   const fichaValida = nome.trim().length > 1 && telefone.trim().length > 7 && carro.trim().length > 0;
 
   const indiceVisivel: Record<Etapa, number> = {
     tipo: 0,
     plano: 1,
-    servicoPlano: 1,
+    porte: 1,
+    beneficio: 1,
     horario: 2,
     ficha: 3,
     confirmacao: 4,
@@ -125,32 +131,21 @@ export default function BookingFlow() {
 
   function escolherTipo(tipo: TipoAtendimento) {
     setTipoAtendimento(tipo);
-    setEtapa(tipo === "avulso" ? "horario" : "plano");
+    setEtapa(etapaInicial(tipo, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario));
   }
 
-  function escolherPlano(id: PlanoId) {
-    selecionarPlano(id);
-    const servicos = servicosPorPlano[id];
-    if (servicos.length === 1) {
-      setServicoPlano(servicos[0]);
-      setEtapa("horario");
-    } else {
-      setEtapa("servicoPlano");
-    }
-  }
-
-  function escolherServicoPlano(nome: string) {
-    setServicoPlano(nome);
+  function escolherBeneficio(nome: string) {
+    setBeneficioSelecionado(nome);
     setEtapa("horario");
   }
 
   function selecionarSlot(hora: string) {
-    setSlotSelecionado({ dia: diaSelecionadoDia, hora });
+    setSlotSelecionado({ dia: dataSelecionadaIso, hora });
     setErro(null);
   }
 
-  function trocarDia(dia: string) {
-    setDiaSelecionadoDia(dia);
+  function trocarData(iso: string) {
+    setDataSelecionadaIso(iso);
     setSlotSelecionado(null);
   }
 
@@ -171,7 +166,7 @@ export default function BookingFlow() {
           avulsosIds: avulsosSelecionados.map((s) => s.id),
           planoId: planoSelecionado,
           porteVeiculo,
-          servicoPlano,
+          servicoPlano: beneficioSelecionado,
           dia: slotSelecionado.dia,
           horario: slotSelecionado.hora,
         }),
@@ -200,7 +195,7 @@ export default function BookingFlow() {
     setTelefone("");
     setCarro("");
     setPlaca("");
-    setServicoPlano(null);
+    setBeneficioSelecionado(null);
     setReservaId(null);
     setEtapa("tipo");
     reiniciarSelecao();
@@ -270,7 +265,7 @@ export default function BookingFlow() {
                 >
                   <span className="font-heading text-lg font-bold">Sou assinante</span>
                   <p className="mt-2 text-sm text-text-secondary">
-                    Já uso ou quero usar um plano Pitstop.
+                    Já tenho um plano PitStop e quero usar um benefício.
                   </p>
                 </button>
               </div>
@@ -286,18 +281,17 @@ export default function BookingFlow() {
 
           {etapa === "plano" && (
             <div>
-              <h3 className="font-heading text-xl font-bold">Qual plano você assina?</h3>
-              <p className="mt-1 mb-6 text-sm text-text-secondary">
-                Veículo: <span className="text-gold">{porte.nome}</span>
-              </p>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <h3 className="font-heading text-xl font-bold">Qual é o seu plano?</h3>
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 {listaPlanos.map((p) => (
-                  <PlanoCard
+                  <button
                     key={p.id}
-                    plano={p}
-                    porteVeiculo={porteVeiculo}
-                    onClick={() => escolherPlano(p.id)}
-                  />
+                    type="button"
+                    onClick={() => selecionarPlano(p.id)}
+                    className="rounded-sm border border-white/10 bg-asphalt p-6 text-center font-heading text-lg font-bold uppercase tracking-wide transition hover:border-gold"
+                  >
+                    {p.nome}
+                  </button>
                 ))}
               </div>
               <button
@@ -310,27 +304,70 @@ export default function BookingFlow() {
             </div>
           )}
 
-          {etapa === "servicoPlano" && plano && (
+          {etapa === "porte" && (
             <div>
-              <h3 className="font-heading text-xl font-bold">Qual serviço você quer agendar?</h3>
-              <p className="mt-1 mb-6 text-sm text-text-secondary">
-                Plano: <span className="text-gold">{plano.nome}</span> · {porte.nome}
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {servicosPorPlano[plano.id].map((nome) => (
+              <h3 className="font-heading text-xl font-bold">Qual é o seu veículo?</h3>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {listaPortesVeiculo.map((p) => (
                   <button
-                    key={nome}
+                    key={p.id}
                     type="button"
-                    onClick={() => escolherServicoPlano(nome)}
-                    className="rounded-sm border border-white/10 bg-asphalt p-5 text-left font-heading text-base font-bold transition hover:border-gold"
+                    onClick={() => definirPorteVeiculo(p.id)}
+                    className="rounded-sm border border-white/10 bg-asphalt p-6 text-left transition hover:border-gold"
                   >
-                    {nome}
+                    <span className="block font-heading text-base font-bold">{p.nome}</span>
+                    <span className="block font-mono text-xs uppercase tracking-wide text-text-secondary">
+                      {p.descricao}
+                    </span>
                   </button>
                 ))}
               </div>
               <button
                 type="button"
                 onClick={() => setEtapa("plano")}
+                className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+              >
+                Voltar
+              </button>
+            </div>
+          )}
+
+          {etapa === "beneficio" && plano && (
+            <div>
+              <h3 className="font-heading text-xl font-bold">O que você quer usar?</h3>
+              <p className="mt-1 mb-6 text-sm text-text-secondary">
+                Plano: <span className="text-gold">{plano.nome}</span> · {porte.nome}
+              </p>
+
+              <div className="mb-6 rounded-sm border border-white/10 bg-asphalt p-4">
+                <p className="font-heading text-xs font-bold uppercase tracking-[0.2em] text-gold">
+                  Seu {plano.nome}
+                </p>
+                <ul className="mt-2 space-y-1 text-sm text-text-secondary">
+                  {plano.beneficios.map((b) => (
+                    <li key={b}>• {b}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {servicosPorPlano[plano.id].map((nome) => (
+                  <button
+                    key={nome}
+                    type="button"
+                    onClick={() => escolherBeneficio(nome)}
+                    className="rounded-sm border border-white/10 bg-asphalt p-5 text-left transition hover:border-gold"
+                  >
+                    <span className="font-heading text-base font-bold">{nome}</span>
+                    {beneficiosAgendaveis[nome] && (
+                      <p className="mt-1 text-sm text-text-secondary">{beneficiosAgendaveis[nome]}</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEtapa("porte")}
                 className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
               >
                 Voltar
@@ -358,63 +395,32 @@ export default function BookingFlow() {
                 {tipoAtendimento === "assinatura" && plano && (
                   <>
                     Plano: <span className="text-gold">{plano.nome}</span>
-                    {servicoPlano && <> · {servicoPlano}</>} · {porte.nome} ·{" "}
-                    {precoPlano != null ? `${formatarPreco(precoPlano)}/mês` : ""}
+                    {beneficioSelecionado && <> · {beneficioSelecionado}</>} · {porte.nome}
                   </>
                 )}
               </p>
 
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {diasAgendamento.map((dia) => (
-                  <button
-                    key={dia}
-                    type="button"
-                    onClick={() => trocarDia(dia)}
-                    className={`shrink-0 rounded-sm px-4 py-2 font-heading text-sm font-semibold transition ${
-                      dia === diaSelecionadoDia
-                        ? "bg-gold text-asphalt"
-                        : "bg-asphalt text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    {diaAbreviado[dia] ?? dia}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {horariosAgendamento.map((hora) => {
-                  const chave = `${diaSelecionadoDia}-${hora}`;
-                  const indisponivel = horariosIndisponiveisMock.has(chave) || ocupados.has(chave);
-                  const selecionado =
-                    slotSelecionado?.dia === diaSelecionadoDia && slotSelecionado?.hora === hora;
-                  return (
-                    <button
-                      key={hora}
-                      type="button"
-                      disabled={indisponivel}
-                      onClick={() => selecionarSlot(hora)}
-                      className={`flex w-full items-center justify-between rounded-sm px-4 py-3 font-mono text-sm transition ${
-                        indisponivel
-                          ? "cursor-not-allowed bg-white/5 text-text-secondary/40"
-                          : selecionado
-                          ? "bg-gold text-asphalt"
-                          : "bg-asphalt text-text-primary hover:text-gold"
-                      }`}
-                    >
-                      <span>{hora}</span>
-                      <span className="text-xs uppercase">
-                        {indisponivel ? "Ocupado" : selecionado ? "Selecionado" : "Livre"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <DateTimePicker
+                datasRapidas={datasRapidas}
+                dataSelecionadaIso={dataSelecionadaIso}
+                onSelecionarData={trocarData}
+                horarios={horariosAgendamento}
+                ocupados={ocupados}
+                horaSelecionada={slotSelecionado?.dia === dataSelecionadaIso ? slotSelecionado.hora : null}
+                onSelecionarHora={selecionarSlot}
+              />
 
               <div className="mt-6 flex gap-3">
                 <button
                   type="button"
                   onClick={() =>
-                    setEtapa(tipoAtendimento === "assinatura" ? "servicoPlano" : "tipo")
+                    setEtapa(
+                      tipoAtendimento === "assinatura"
+                        ? plano && servicosPorPlano[plano.id].length > 1
+                          ? "beneficio"
+                          : "porte"
+                        : "tipo"
+                    )
                   }
                   className="rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
                 >
@@ -427,7 +433,7 @@ export default function BookingFlow() {
                   className="flex-1 rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {slotSelecionado
-                    ? `Continuar · ${diaAbreviado[slotSelecionado.dia] ?? slotSelecionado.dia} ${slotSelecionado.hora}`
+                    ? `Continuar · ${formatarDataCurta(slotSelecionado.dia)} ${slotSelecionado.hora}`
                     : "Selecione um horário"}
                 </button>
               </div>
@@ -464,13 +470,13 @@ export default function BookingFlow() {
                 {tipoAtendimento === "assinatura" && plano && (
                   <>
                     <SpecItem label="Plano" valor={plano.nome} />
-                    {servicoPlano && <SpecItem label="Serviço" valor={servicoPlano} />}
+                    {beneficioSelecionado && <SpecItem label="Cuidado" valor={beneficioSelecionado} />}
                   </>
                 )}
                 <SpecItem label="Porte" valor={porte.nome} />
                 {slotSelecionado && (
                   <>
-                    <SpecItem label="Data" valor={slotSelecionado.dia} />
+                    <SpecItem label="Data" valor={formatarDataCurta(slotSelecionado.dia)} />
                     <SpecItem label="Horário" valor={slotSelecionado.hora} />
                   </>
                 )}
@@ -550,11 +556,13 @@ export default function BookingFlow() {
                         "Ducha Pitstop",
                         ...avulsosSelecionados.filter((s) => !s.requiresEvaluation).map((s) => s.nome),
                       ]
-                    : [plano?.nome, servicoPlano].filter((v): v is string => Boolean(v));
+                    : [plano?.nome, beneficioSelecionado].filter((v): v is string => Boolean(v));
                 const selo = tipoAtendimento === "avulso" ? "AGENDAMENTO" : plano?.nome.toUpperCase() ?? "";
-                const mensagemWhats = `Olá! Acabei de agendar na Pitstop pra ${slotSelecionado.dia} às ${slotSelecionado.hora}. Meu PitPass: #${codigo}`;
+                const mensagemWhats = `Olá! Acabei de agendar na Pitstop pra ${formatarDataCurta(
+                  slotSelecionado.dia
+                )} às ${slotSelecionado.hora}. Meu PitPass: #${codigo}`;
                 const linkCalendario = linkGoogleCalendar({
-                  diaSemana: slotSelecionado.dia,
+                  dataIso: slotSelecionado.dia,
                   horario: slotSelecionado.hora,
                   titulo: "Pitstop 084",
                   detalhes: servicosPitpass.join(" + "),
@@ -574,7 +582,7 @@ export default function BookingFlow() {
                         planoId={plano?.id}
                         carro={carro}
                         porteNome={porte.nome}
-                        diaSemana={slotSelecionado.dia}
+                        dataIso={slotSelecionado.dia}
                         horario={slotSelecionado.hora}
                         servicos={servicosPitpass}
                         codigo={codigo}

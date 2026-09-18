@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos } from "@/db/schema";
 import {
@@ -10,16 +10,27 @@ import {
   servicosPorPlano,
   precoServico,
   VehicleSize,
-  diasAgendamento,
+  diaFechado,
   horariosAgendamento,
 } from "@/lib/data";
+import { hojeIso } from "@/lib/agenda";
 
 export async function GET() {
   const ocupados = await db
     .select({ dia: agendamentos.dia, horario: agendamentos.horario })
-    .from(agendamentos);
+    .from(agendamentos)
+    .where(gte(agendamentos.dia, hojeIso()));
 
   return NextResponse.json({ ocupados });
+}
+
+function dataValida(dia: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return false;
+  const [ano, mes, diaDoMes] = dia.split("-").map(Number);
+  const data = new Date(ano, mes - 1, diaDoMes);
+  if (Number.isNaN(data.getTime())) return false;
+  if (data.getDay() === diaFechado) return false;
+  return dia >= hojeIso();
 }
 
 export async function POST(request: Request) {
@@ -44,7 +55,7 @@ export async function POST(request: Request) {
     typeof carro !== "string" || carro.trim().length < 1 ||
     (tipoAtendimento !== "avulso" && tipoAtendimento !== "assinatura") ||
     (porteVeiculo !== "P" && porteVeiculo !== "G") ||
-    typeof dia !== "string" || !diasAgendamento.includes(dia) ||
+    typeof dia !== "string" || !dataValida(dia) ||
     typeof horario !== "string" || !horariosAgendamento.includes(horario)
   ) {
     return NextResponse.json({ erro: "Dados obrigatórios inválidos" }, { status: 400 });

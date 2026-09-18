@@ -13,7 +13,7 @@ export default function PitPass({
   planoId,
   carro,
   porteNome,
-  diaSemana,
+  dataIso,
   horario,
   servicos,
   codigo,
@@ -23,7 +23,7 @@ export default function PitPass({
   planoId?: PlanoId | null;
   carro: string;
   porteNome: string;
-  diaSemana: string;
+  dataIso: string;
   horario: string;
   servicos: string[];
   codigo: string;
@@ -48,7 +48,7 @@ export default function PitPass({
       <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">{porteNome}</p>
 
       <p className="mt-4 font-mono text-sm text-white">
-        {formatarDataCurta(diaSemana, horario)} <span className="text-text-secondary">•</span> {horario}
+        {formatarDataCurta(dataIso)} <span className="text-text-secondary">•</span> {horario}
       </p>
 
       <div className="mt-4 space-y-0.5 border-t border-white/10 pt-3">

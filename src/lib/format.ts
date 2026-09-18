@@ -5,6 +5,14 @@ export function formatarPreco(valor: number) {
   });
 }
 
+/** Separa "R$" do valor numérico formatado, para compor o preço em partes (moeda / valor / período). */
+export function formatarPrecoPartes(valor: number): { moeda: string; valor: string } {
+  const completo = formatarPreco(valor);
+  const match = completo.match(/^(\D+)\s*([\d.,]+)$/);
+  if (!match) return { moeda: "R$", valor: completo };
+  return { moeda: match[1].trim(), valor: match[2] };
+}
+
 export function formatarTelefone(valor: string): string {
   const digitos = valor.replace(/\D/g, "").slice(0, 11);
   if (digitos.length === 0) return "";
