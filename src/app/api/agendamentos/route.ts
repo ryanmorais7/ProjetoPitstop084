@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos } from "@/db/schema";
 import {
@@ -19,7 +19,7 @@ export async function GET() {
   const ocupados = await db
     .select({ dia: agendamentos.dia, horario: agendamentos.horario })
     .from(agendamentos)
-    .where(gte(agendamentos.dia, hojeIso()));
+    .where(and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado")));
 
   return NextResponse.json({ ocupados });
 }
@@ -101,7 +101,13 @@ export async function POST(request: Request) {
   const existente = await db
     .select({ id: agendamentos.id })
     .from(agendamentos)
-    .where(and(eq(agendamentos.dia, dia), eq(agendamentos.horario, horario)))
+    .where(
+      and(
+        eq(agendamentos.dia, dia),
+        eq(agendamentos.horario, horario),
+        ne(agendamentos.status, "cancelado")
+      )
+    )
     .limit(1);
 
   if (existente.length > 0) {

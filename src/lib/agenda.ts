@@ -32,13 +32,17 @@ export function proximasDatasUteis(quantidade = 6): Date[] {
   return datas;
 }
 
-function parseIso(dataIso: string): Date {
+function parseIso(dataIso: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataIso)) return null;
   const [ano, mes, dia] = dataIso.split("-").map(Number);
-  return new Date(ano, mes - 1, dia);
+  const data = new Date(ano, mes - 1, dia);
+  return Number.isNaN(data.getTime()) ? null : data;
 }
 
+/** Se `dataIso` não for uma data ISO válida (ex.: registro antigo salvo como nome de dia), devolve o valor original em vez de "undefined". */
 export function formatarDataCurta(dataIso: string): string {
   const data = parseIso(dataIso);
+  if (!data) return dataIso;
   return `${diaAbreviadoCurto[data.getDay()]} • ${data.getDate()} ${mesAbreviado[data.getMonth()]}`;
 }
 
@@ -58,7 +62,7 @@ export function linkGoogleCalendar({
   detalhes: string;
 }): string {
   const [hora, minuto] = horario.split(":").map(Number);
-  const inicio = parseIso(dataIso);
+  const inicio = parseIso(dataIso) ?? new Date();
   inicio.setHours(hora ?? 0, minuto ?? 0, 0, 0);
   const fim = new Date(inicio.getTime() + 60 * 60 * 1000);
   const endereco = `${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}, ${enderecoPitstop.linha3}`;

@@ -17,5 +17,9 @@ export const agendamentos = pgTable("agendamentos", {
   /** Data real do agendamento, formato ISO "YYYY-MM-DD" (não é mais nome de dia da semana). */
   dia: text("dia").notNull(),
   horario: text("horario").notNull(),
+  /** "confirmado" | "concluido" | "cancelado" — só confirmado/concluido ocupam o horário. */
+  status: text("status").notNull().default("confirmado"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export type StatusAgendamento = "confirmado" | "concluido" | "cancelado";
