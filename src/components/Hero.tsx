@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Bolt from "./Bolt";
 import { scrollToId } from "@/lib/scroll";
 import {
@@ -42,8 +43,18 @@ export default function Hero() {
             />
             <source src={HERO_VIDEO_SRC} />
           </video>
+        ) : poster ? (
+          // Foto estática até o vídeo cinematográfico ser definido em src/lib/heroMedia.ts
+          <Image
+            src={poster}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
         ) : (
-          // Placeholder até o vídeo cinematográfico (Porsche) ser definido em src/lib/heroMedia.ts
+          // Placeholder até haver vídeo ou foto em src/lib/heroMedia.ts
           <div
             className="h-full w-full"
             style={{

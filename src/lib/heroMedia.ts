@@ -8,5 +8,5 @@
  */
 export const HERO_VIDEO_SRC: string | null = null;
 export const HERO_VIDEO_MOBILE_SRC: string | null = null;
-export const HERO_POSTER_SRC: string | null = null;
+export const HERO_POSTER_SRC: string | null = "/hero-pitstop.jpg";
 export const HERO_MOBILE_POSTER_SRC: string | null = null;
