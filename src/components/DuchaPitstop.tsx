@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { duchaPitstop, precoServico } from "@/lib/data";
 import { formatarPreco } from "@/lib/format";
 import { useSelection } from "@/context/SelectionContext";
@@ -26,10 +27,15 @@ export default function DuchaPitstop() {
         <div className="mt-10 grid gap-10 md:grid-cols-2 md:items-start">
           <Reveal delayMs={60}>
             <div className="overflow-hidden rounded-sm border border-white/10 bg-panel">
-              <div
-                className="aspect-video w-full"
-                style={{ background: "linear-gradient(135deg, #1c1a10, #0a0a0b)" }}
-              />
+              <div className="relative aspect-video w-full">
+                <Image
+                  src="/hero-pitstop.jpg"
+                  alt="Carro coberto de espuma durante a Ducha Pitstop"
+                  fill
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                  className="object-cover"
+                />
+              </div>
               <div className="p-6">
                 <ul className="space-y-2 text-sm">
                   {duchaPitstop.itens?.map((item) => (

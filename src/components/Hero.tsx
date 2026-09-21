@@ -30,7 +30,7 @@ export default function Hero() {
       <div className="absolute inset-0">
         {HERO_VIDEO_SRC ? (
           <video
-            className="h-full w-full object-cover object-[50%_78%]"
+            className="h-full w-full object-cover"
             autoPlay
             muted
             loop

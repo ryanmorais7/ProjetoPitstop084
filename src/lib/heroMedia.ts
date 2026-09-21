@@ -8,5 +8,5 @@
  */
 export const HERO_VIDEO_SRC: string | null = "/hero-porsche.mp4";
 export const HERO_VIDEO_MOBILE_SRC: string | null = "/hero-porsche-mobile.mp4";
-export const HERO_POSTER_SRC: string | null = "/hero-pitstop.jpg";
+export const HERO_POSTER_SRC: string | null = "/hero-porsche-poster.jpg";
 export const HERO_MOBILE_POSTER_SRC: string | null = null;
