@@ -26,7 +26,7 @@ export default function Hero() {
   const poster = (mobile ? HERO_MOBILE_POSTER_SRC : null) ?? HERO_POSTER_SRC;
 
   return (
-    <section className="relative flex min-h-[100svh] items-end overflow-hidden bg-asphalt">
+    <section id="hero" className="relative flex min-h-[100svh] items-end overflow-hidden bg-asphalt">
       <div className="absolute inset-0">
         {HERO_VIDEO_SRC ? (
           <video

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { paraIso, hojeIso } from "@/lib/agenda";
+import { paraIso, hojeIso, horaAtualFortaleza } from "@/lib/agenda";
 
 const diaAbreviadoCurto = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
@@ -47,8 +47,8 @@ export default function DateTimePicker({
                 ativo ? "bg-gold text-asphalt" : "bg-asphalt text-text-secondary hover:text-text-primary"
               }`}
             >
-              <span className="text-xs">{diaAbreviadoCurto[data.getDay()]}</span>
-              <span className="text-base font-bold">{data.getDate()}</span>
+              <span className="text-xs">{diaAbreviadoCurto[data.getUTCDay()]}</span>
+              <span className="text-base font-bold">{data.getUTCDate()}</span>
             </button>
           );
         })}
@@ -76,7 +76,9 @@ export default function DateTimePicker({
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
           {horarios.map((hora) => {
             const chave = `${dataSelecionadaIso}-${hora}`;
-            const indisponivel = ocupados.has(chave);
+            const ocupado = ocupados.has(chave);
+            const jaPassou = dataSelecionadaIso === hojeIso() && hora <= horaAtualFortaleza();
+            const indisponivel = ocupado || jaPassou;
             const selecionado = horaSelecionada === hora;
             return (
               <button
@@ -96,7 +98,7 @@ export default function DateTimePicker({
                   {selecionado && "✓ "}
                   {hora}
                 </span>
-                {indisponivel && <span className="text-[10px] uppercase tracking-wide">Ocupado</span>}
+                {ocupado && <span className="text-[10px] uppercase tracking-wide">Ocupado</span>}
               </button>
             );
           })}

@@ -9,6 +9,7 @@ import {
   PlanoId,
   servicosPorPlano,
   beneficiosAgendaveis,
+  itensInclusosBeneficio,
   portesVeiculo,
   precoServico,
   etapasAgendamento,
@@ -16,7 +17,8 @@ import {
   linkWhatsapp,
   linkComoChegar,
 } from "@/lib/data";
-import { proximasDatasUteis, paraIso, formatarDataCurta, linkGoogleCalendar } from "@/lib/agenda";
+import { proximasDatasUteis, paraIso, formatarDataCurta } from "@/lib/agenda";
+import { mensagemAgendamentoAvulso, mensagemAgendamentoPitPass } from "@/lib/whatsapp";
 import { formatarPreco, formatarTelefone } from "@/lib/format";
 import { useSelection, TipoAtendimento } from "@/context/SelectionContext";
 import { scrollToId } from "@/lib/scroll";
@@ -61,7 +63,7 @@ export default function BookingFlow() {
   } = useSelection();
 
   const [beneficioSelecionado, setBeneficioSelecionado] = useState<string | null>(null);
-  const [reservaId, setReservaId] = useState<number | null>(null);
+  const [reserva, setReserva] = useState<{ id: number; codigo: string } | null>(null);
   const [etapa, setEtapa] = useState<Etapa>(() =>
     etapaInicial(tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario)
   );
@@ -178,9 +180,13 @@ export default function BookingFlow() {
         setEtapa("horario");
         return;
       }
-      if (!resposta.ok) throw new Error();
-      const dados: { id: number } = await resposta.json();
-      setReservaId(dados.id);
+      if (!resposta.ok) {
+        const corpo = await resposta.json().catch(() => null);
+        setErro(corpo?.erro ?? "Não foi possível confirmar o agendamento agora. Tente novamente.");
+        return;
+      }
+      const dados: { id: number; codigo: string } = await resposta.json();
+      setReserva(dados);
       setEtapa("confirmacao");
     } catch {
       setErro("Não foi possível confirmar o agendamento agora. Tente novamente.");
@@ -196,7 +202,7 @@ export default function BookingFlow() {
     setCarro("");
     setPlaca("");
     setBeneficioSelecionado(null);
-    setReservaId(null);
+    setReserva(null);
     setEtapa("tipo");
     reiniciarSelecao();
   }
@@ -361,6 +367,16 @@ export default function BookingFlow() {
                     <span className="font-heading text-base font-bold">{nome}</span>
                     {beneficiosAgendaveis[nome] && (
                       <p className="mt-1 text-sm text-text-secondary">{beneficiosAgendaveis[nome]}</p>
+                    )}
+                    {itensInclusosBeneficio[nome]?.length > 0 && (
+                      <div className="mt-2">
+                        <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Inclui</p>
+                        <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
+                          {itensInclusosBeneficio[nome].map((item) => (
+                            <li key={item}>• {item}</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </button>
                 ))}
@@ -546,10 +562,10 @@ export default function BookingFlow() {
             </form>
           )}
 
-          {etapa === "confirmacao" && slotSelecionado && reservaId && (
+          {etapa === "confirmacao" && slotSelecionado && reserva && (
             <div className="text-center">
               {(() => {
-                const codigo = `P084-${String(reservaId).padStart(4, "0")}`;
+                const codigo = reserva.codigo;
                 const servicosPitpass =
                   tipoAtendimento === "avulso"
                     ? [
@@ -558,15 +574,27 @@ export default function BookingFlow() {
                       ]
                     : [plano?.nome, beneficioSelecionado].filter((v): v is string => Boolean(v));
                 const selo = tipoAtendimento === "avulso" ? "AGENDAMENTO" : plano?.nome.toUpperCase() ?? "";
-                const mensagemWhats = `Olá! Acabei de agendar na Pitstop pra ${formatarDataCurta(
-                  slotSelecionado.dia
-                )} às ${slotSelecionado.hora}. Meu PitPass: #${codigo}`;
-                const linkCalendario = linkGoogleCalendar({
-                  dataIso: slotSelecionado.dia,
-                  horario: slotSelecionado.hora,
-                  titulo: "Pitstop 084",
-                  detalhes: servicosPitpass.join(" + "),
-                });
+                const mensagemWhats =
+                  tipoAtendimento === "avulso"
+                    ? mensagemAgendamentoAvulso({
+                        nome,
+                        veiculo: carro,
+                        porteNome: porte.nome,
+                        servico: servicosPitpass.join(" + "),
+                        dataIso: slotSelecionado.dia,
+                        horario: slotSelecionado.hora,
+                        codigo,
+                      })
+                    : mensagemAgendamentoPitPass({
+                        nome,
+                        veiculo: carro,
+                        porteNome: porte.nome,
+                        plano: plano?.nome ?? "",
+                        beneficio: beneficioSelecionado ?? "",
+                        dataIso: slotSelecionado.dia,
+                        horario: slotSelecionado.hora,
+                        codigo,
+                      });
 
                 return (
                   <>
@@ -614,14 +642,6 @@ export default function BookingFlow() {
                     )}
 
                     <div className="mx-auto mt-6 flex max-w-sm flex-col gap-3">
-                      <a
-                        href={linkCalendario}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
-                      >
-                        Adicionar à agenda
-                      </a>
                       <a
                         href={linkComoChegar}
                         target="_blank"

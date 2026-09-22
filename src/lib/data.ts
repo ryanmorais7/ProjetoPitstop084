@@ -85,6 +85,36 @@ export const listaPlanos: Plano[] = [planos.black, planos.gold, planos.diamante]
 export const regraUtilizacaoPlanos =
   "Os benefícios são válidos durante o ciclo mensal da assinatura e não acumulam para o mês seguinte.";
 
+/**
+ * Regras reais de uso de cada benefício, derivadas dos textos de `planos[x].beneficios` acima
+ * (cada linha cita o bullet de origem — não é um número inventado). `limite: null` = ilimitado.
+ */
+export const regrasBeneficios: Record<
+  PlanoId,
+  Record<string, { tipo: "ciclo" | "semanal"; limite: number | null }>
+> = {
+  black: {
+    "Lavagem Black": { tipo: "semanal", limite: 1 }, // "1 lavagem semanal"
+  },
+  gold: {
+    "Lavagem Gold": { tipo: "ciclo", limite: 1 }, // "1 Lavagem Gold mensal"
+    "Manutenção": { tipo: "ciclo", limite: 4 }, // "4 Manutenções mensais"
+  },
+  diamante: {
+    "Lavagem Diamante": { tipo: "ciclo", limite: 1 }, // "1 Lavagem Diamante mensal"
+    "Lavagem Gold": { tipo: "ciclo", limite: 2 }, // "2 Lavagens Gold mensais"
+    "Manutenção": { tipo: "semanal", limite: null }, // "Manutenção semanal ilimitada"
+  },
+};
+
+/**
+ * Itens detalhados de "o que inclui" cada lavagem/benefício, pra mostrar no card da etapa
+ * "o que você quer usar?". Não existe conteúdo comercial definido pra isso ainda — fica vazio
+ * de propósito (a UI só mostra o bloco "Inclui" quando a lista não estiver vazia) até vir o
+ * texto real.
+ */
+export const itensInclusosBeneficio: Record<string, string[]> = {};
+
 export type CategoriaCuidado = "limpeza" | "protecao" | "estetica";
 
 export const categoriasCuidado: Record<CategoriaCuidado, string> = {

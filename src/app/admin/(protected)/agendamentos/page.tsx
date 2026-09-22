@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { and, asc, gte, ne } from "drizzle-orm";
+import { and, asc, gte, ne, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { agendamentos } from "@/db/schema";
+import { agendamentos, assinaturas } from "@/db/schema";
 import { hojeIso, formatarDataCurta } from "@/lib/agenda";
 import { formatarPreco } from "@/lib/format";
-import { linkWhatsapp } from "@/lib/data";
+import { linkWhatsapp, planos, PlanoId } from "@/lib/data";
 import { atualizarStatusAgendamento } from "../../actions";
 
 interface AdicionalJson {
@@ -45,19 +45,24 @@ export default async function AgendamentosPage({
   const { ver } = await searchParams;
   const mostrarTodos = ver === "todas";
 
-  const registros = await db
-    .select()
-    .from(agendamentos)
-    .where(
-      mostrarTodos
-        ? undefined
-        : and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado"))
-    )
-    .orderBy(asc(agendamentos.dia), asc(agendamentos.horario));
+  const [registros, assinaturasAtivas] = await Promise.all([
+    db
+      .select()
+      .from(agendamentos)
+      .where(
+        mostrarTodos
+          ? undefined
+          : and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado"))
+      )
+      .orderBy(asc(agendamentos.dia), asc(agendamentos.horario)),
+    db.select().from(assinaturas).where(eq(assinaturas.status, "ativo")),
+  ]);
+
+  const assinaturaPorCliente = new Map(assinaturasAtivas.map((a) => [a.clienteId, a]));
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-heading text-2xl font-bold">Agendamentos</h1>
         <div className="flex gap-2 font-mono text-xs uppercase tracking-wide">
           <Link
@@ -80,59 +85,85 @@ export default async function AgendamentosPage({
       )}
 
       <div className="space-y-3">
-        {registros.map((r) => (
-          <div
-            key={r.id}
-            className="rounded-sm border border-white/10 bg-panel p-4 sm:flex sm:items-center sm:justify-between sm:gap-4"
-          >
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm">
-                <span className="text-gold">{formatarDataCurta(r.dia)}</span>
-                <span className="text-text-secondary">·</span>
-                <span>{r.horario}</span>
-                <span className={`text-xs uppercase ${estiloStatus[r.status] ?? ""}`}>{r.status}</span>
-              </div>
-              <p className="mt-1 font-heading text-base font-bold">{r.nome}</p>
-              <p className="text-sm text-text-secondary">
-                {r.carro}
-                {r.placa ? ` · ${r.placa}` : ""} · {r.categoriaVeiculo === "G" ? "SUV / Pick-up" : "Hatch / Sedan"}
-              </p>
-              <p className="mt-1 text-sm text-text-primary">{descreverServicos(r)}</p>
-              {r.preco && (
-                <p className="mt-1 font-mono text-sm text-gold">{formatarPreco(Number(r.preco))}</p>
-              )}
-              <a
-                href={linkWhatsapp(`Olá ${r.nome}! Aqui é da Pitstop 084, sobre seu agendamento.`)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-block font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 hover:text-gold hover:underline"
-              >
-                {r.telefone} · WhatsApp
-              </a>
-            </div>
+        {registros.map((r) => {
+          const assinatura = r.clienteId ? assinaturaPorCliente.get(r.clienteId) : null;
+          const nomePlano = assinatura ? planos[assinatura.plano as PlanoId]?.nome : null;
 
-            {r.status === "confirmado" && (
-              <div className="mt-4 flex shrink-0 gap-2 sm:mt-0">
-                <form action={atualizarStatusAgendamento.bind(null, r.id, "concluido")}>
-                  <button
-                    type="submit"
-                    className="rounded-sm border border-white/15 px-4 py-2 font-mono text-xs uppercase tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+          return (
+            <div
+              key={r.id}
+              className="rounded-sm border border-white/10 bg-panel p-4 sm:flex sm:items-center sm:justify-between sm:gap-4"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm">
+                  {r.codigo && <span className="text-white">{r.codigo}</span>}
+                  <span className="text-text-secondary">·</span>
+                  <span className="text-gold">{formatarDataCurta(r.dia)}</span>
+                  <span className="text-text-secondary">·</span>
+                  <span>{r.horario}</span>
+                  <span className={`text-xs uppercase ${estiloStatus[r.status] ?? ""}`}>{r.status}</span>
+                </div>
+
+                {r.clienteId ? (
+                  <Link
+                    href={`/admin/clientes/${r.clienteId}`}
+                    className="mt-1 block font-heading text-base font-bold hover:text-gold"
                   >
-                    Concluir
-                  </button>
-                </form>
-                <form action={atualizarStatusAgendamento.bind(null, r.id, "cancelado")}>
-                  <button
-                    type="submit"
-                    className="rounded-sm border border-white/15 px-4 py-2 font-mono text-xs uppercase tracking-wide text-text-secondary transition hover:border-red-400 hover:text-red-400"
-                  >
-                    Cancelar
-                  </button>
-                </form>
+                    {r.nome}
+                  </Link>
+                ) : (
+                  <p className="mt-1 font-heading text-base font-bold">{r.nome}</p>
+                )}
+
+                <span
+                  className={`mt-1 inline-block rounded-sm px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${
+                    nomePlano ? "bg-gold text-asphalt" : "bg-white/10 text-text-secondary"
+                  }`}
+                >
+                  {nomePlano ? `Cliente PitPass · ${nomePlano}` : "Cliente Pitstop 084"}
+                </span>
+
+                <p className="mt-1 text-sm text-text-secondary">
+                  {r.carro}
+                  {r.placa ? ` · ${r.placa}` : ""} · {r.categoriaVeiculo === "G" ? "SUV / Pick-up" : "Hatch / Sedan"}
+                </p>
+                <p className="mt-1 text-sm text-text-primary">{descreverServicos(r)}</p>
+                {r.preco && (
+                  <p className="mt-1 font-mono text-sm text-gold">{formatarPreco(Number(r.preco))}</p>
+                )}
+                <a
+                  href={linkWhatsapp(`Olá ${r.nome}! Aqui é da Pitstop 084, sobre seu agendamento.`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-block font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 hover:text-gold hover:underline"
+                >
+                  {r.telefone} · WhatsApp
+                </a>
               </div>
-            )}
-          </div>
-        ))}
+
+              {r.status === "confirmado" && (
+                <div className="mt-4 flex shrink-0 gap-2 sm:mt-0">
+                  <form action={atualizarStatusAgendamento.bind(null, r.id, "concluido")}>
+                    <button
+                      type="submit"
+                      className="rounded-sm border border-white/15 px-4 py-2 font-mono text-xs uppercase tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+                    >
+                      Concluir
+                    </button>
+                  </form>
+                  <form action={atualizarStatusAgendamento.bind(null, r.id, "cancelado")}>
+                    <button
+                      type="submit"
+                      className="rounded-sm border border-white/15 px-4 py-2 font-mono text-xs uppercase tracking-wide text-text-secondary transition hover:border-red-400 hover:text-red-400"
+                    >
+                      Cancelar
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

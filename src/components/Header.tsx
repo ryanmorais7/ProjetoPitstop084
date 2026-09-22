@@ -1,17 +1,22 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { scrollToId } from "@/lib/scroll";
 import { useSelection } from "@/context/SelectionContext";
 import Logo from "./Logo";
 
 const links = [
   { id: "sobre", label: "Sobre" },
-  { id: "servicos", label: "Serviços" },
+  { id: "servicos", label: "Ducha rápida" },
   { id: "planos", label: "Planos" },
+  { id: "agendamento", label: "Agendamentos" },
 ];
 
 export default function Header() {
   const { setTipoAtendimento } = useSelection();
+  const pathname = usePathname();
+  const naHome = pathname === "/";
 
   function souAssinante() {
     setTipoAtendimento("assinatura");
@@ -21,7 +26,15 @@ export default function Header() {
   return (
     <header className="fixed top-0 z-40 w-full border-b border-white/5 bg-asphalt/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Logo className="text-base" />
+        {naHome ? (
+          <button type="button" onClick={() => scrollToId("hero")} className="transition hover:opacity-80">
+            <Logo className="text-base" />
+          </button>
+        ) : (
+          <Link href="/" className="transition hover:opacity-80">
+            <Logo className="text-base" />
+          </Link>
+        )}
         <nav className="hidden gap-8 text-sm text-text-secondary md:flex">
           {links.map((link) => (
             <button

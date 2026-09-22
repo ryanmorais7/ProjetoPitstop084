@@ -63,15 +63,13 @@ export default function MonteSeuPitstop() {
           ))}
         </div>
 
-        {!verMais && (
-          <button
-            type="button"
-            onClick={() => setVerMais(true)}
-            className="mt-4 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline"
-          >
-            Ver mais cuidados +
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setVerMais((atual) => !atual)}
+          className="mt-4 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline"
+        >
+          {verMais ? "Mostrar menos ↑" : "Ver mais cuidados +"}
+        </button>
 
         {verMais && (
           <div className="mt-6 space-y-6">

@@ -3,10 +3,13 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { agendamentos, StatusAgendamento } from "@/db/schema";
+import { horariosBloqueados, StatusAgendamento } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { COOKIE_SESSAO, criarTokenSessao, exigirSessaoAdmin, senhaValida } from "@/lib/adminAuth";
+import { atualizarStatus } from "@/lib/bookings";
+import { horariosAgendamento } from "@/lib/data";
+import { dataValidaParaAgendar } from "@/lib/agenda";
 
 export interface LoginState {
   erro?: string;
@@ -42,7 +45,28 @@ export async function logout() {
 
 export async function atualizarStatusAgendamento(id: number, status: StatusAgendamento) {
   await exigirSessaoAdmin();
-  await db.update(agendamentos).set({ status }).where(eq(agendamentos.id, id));
+  await atualizarStatus(id, status);
   revalidatePath("/admin/agendamentos");
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/clientes");
+}
+
+export async function bloquearHorario(formData: FormData) {
+  await exigirSessaoAdmin();
+  const dia = String(formData.get("dia") ?? "");
+  const horario = String(formData.get("horario") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim() || null;
+
+  if (!dataValidaParaAgendar(dia) || !horariosAgendamento.includes(horario)) {
+    return;
+  }
+
+  await db.insert(horariosBloqueados).values({ dia, horario, motivo });
+  revalidatePath("/admin/agenda");
+}
+
+export async function desbloquearHorario(id: number) {
+  await exigirSessaoAdmin();
+  await db.delete(horariosBloqueados).where(eq(horariosBloqueados.id, id));
   revalidatePath("/admin/agenda");
 }

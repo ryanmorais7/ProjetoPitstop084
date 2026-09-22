@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { and, eq, gte, ne } from "drizzle-orm";
+import { and, gte, ne, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { agendamentos } from "@/db/schema";
+import { agendamentos, horariosBloqueados, assinaturas } from "@/db/schema";
 import {
   duchaPitstop,
   servicosAvulsos,
@@ -10,27 +10,24 @@ import {
   servicosPorPlano,
   precoServico,
   VehicleSize,
-  diaFechado,
   horariosAgendamento,
 } from "@/lib/data";
-import { hojeIso } from "@/lib/agenda";
+import { hojeIso, dataValidaParaAgendar } from "@/lib/agenda";
+import { criarAgendamento, buscarClientePorTelefone, verificarBeneficioDisponivel } from "@/lib/bookings";
 
 export async function GET() {
-  const ocupados = await db
-    .select({ dia: agendamentos.dia, horario: agendamentos.horario })
-    .from(agendamentos)
-    .where(and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado")));
+  const [ocupados, bloqueados] = await Promise.all([
+    db
+      .select({ dia: agendamentos.dia, horario: agendamentos.horario })
+      .from(agendamentos)
+      .where(and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado"))),
+    db
+      .select({ dia: horariosBloqueados.dia, horario: horariosBloqueados.horario })
+      .from(horariosBloqueados)
+      .where(gte(horariosBloqueados.dia, hojeIso())),
+  ]);
 
-  return NextResponse.json({ ocupados });
-}
-
-function dataValida(dia: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return false;
-  const [ano, mes, diaDoMes] = dia.split("-").map(Number);
-  const data = new Date(ano, mes - 1, diaDoMes);
-  if (Number.isNaN(data.getTime())) return false;
-  if (data.getDay() === diaFechado) return false;
-  return dia >= hojeIso();
+  return NextResponse.json({ ocupados: [...ocupados, ...bloqueados] });
 }
 
 export async function POST(request: Request) {
@@ -55,7 +52,7 @@ export async function POST(request: Request) {
     typeof carro !== "string" || carro.trim().length < 1 ||
     (tipoAtendimento !== "avulso" && tipoAtendimento !== "assinatura") ||
     (porteVeiculo !== "P" && porteVeiculo !== "G") ||
-    typeof dia !== "string" || !dataValida(dia) ||
+    typeof dia !== "string" || !dataValidaParaAgendar(dia) ||
     typeof horario !== "string" || !horariosAgendamento.includes(horario)
   ) {
     return NextResponse.json({ erro: "Dados obrigatórios inválidos" }, { status: 400 });
@@ -66,6 +63,7 @@ export async function POST(request: Request) {
   let servicoPlanoNome: string | null = null;
   let preco: number | null = null;
   let servicosAdicionaisJson: string | null = null;
+  let assinaturaId: number | null = null;
 
   if (tipoAtendimento === "avulso") {
     if (!Array.isArray(avulsosIds) || avulsosIds.some((id) => typeof id !== "string")) {
@@ -96,42 +94,62 @@ export async function POST(request: Request) {
     }
     servicoPlanoNome = servicoPlano;
     preco = plano.precos[porte];
+
+    // Se já existe um cliente com esse telefone e uma assinatura ativa, o benefício
+    // precisa bater com o plano real dele e respeitar a cota real — nunca confiar só na UI.
+    const clienteExistente = await buscarClientePorTelefone(telefone);
+    if (clienteExistente) {
+      const [assinaturaAtiva] = await db
+        .select()
+        .from(assinaturas)
+        .where(and(eq(assinaturas.clienteId, clienteExistente.id), eq(assinaturas.status, "ativo")));
+
+      if (assinaturaAtiva) {
+        if (assinaturaAtiva.plano !== plano.id) {
+          return NextResponse.json(
+            { erro: "Esse WhatsApp já está associado a outro plano PitPass." },
+            { status: 400 }
+          );
+        }
+        const disponibilidade = await verificarBeneficioDisponivel({
+          assinaturaId: assinaturaAtiva.id,
+          plano: plano.id,
+          beneficio: servicoPlanoNome,
+          cicloInicio: assinaturaAtiva.cicloInicio,
+        });
+        if (!disponibilidade.disponivel) {
+          return NextResponse.json(
+            { erro: disponibilidade.motivo ?? "Benefício indisponível." },
+            { status: 400 }
+          );
+        }
+        assinaturaId = assinaturaAtiva.id;
+      }
+    }
   }
 
-  const existente = await db
-    .select({ id: agendamentos.id })
-    .from(agendamentos)
-    .where(
-      and(
-        eq(agendamentos.dia, dia),
-        eq(agendamentos.horario, horario),
-        ne(agendamentos.status, "cancelado")
-      )
-    )
-    .limit(1);
+  const resultado = await criarAgendamento({
+    nome,
+    telefone,
+    carro,
+    placa,
+    porteVeiculo: porte,
+    tipoAtendimento,
+    dia,
+    horario,
+    planoId: plano?.id ?? null,
+    servicoPlano: servicoPlanoNome,
+    servicoId: tipoAtendimento === "avulso" ? duchaPitstop.id : null,
+    servicoNome: tipoAtendimento === "avulso" ? duchaPitstop.nome : servicoPlanoNome,
+    servicosAdicionaisJson,
+    preco,
+    origem: "landing",
+    assinaturaId,
+  });
 
-  if (existente.length > 0) {
-    return NextResponse.json({ erro: "Horário já reservado" }, { status: 409 });
+  if (!resultado.ok) {
+    return NextResponse.json({ erro: resultado.erro }, { status: resultado.status });
   }
 
-  const [registro] = await db
-    .insert(agendamentos)
-    .values({
-      nome: nome.trim(),
-      telefone: telefone.trim(),
-      carro: carro.trim(),
-      placa: typeof placa === "string" && placa.trim() ? placa.trim().toUpperCase() : null,
-      tipoAtendimento,
-      plano: plano?.id ?? null,
-      categoriaVeiculo: porte,
-      servicoId: tipoAtendimento === "avulso" ? duchaPitstop.id : null,
-      servicoNome: tipoAtendimento === "avulso" ? duchaPitstop.nome : servicoPlanoNome,
-      servicosAdicionais: servicosAdicionaisJson,
-      preco: preco != null ? preco.toFixed(2) : null,
-      dia,
-      horario,
-    })
-    .returning({ id: agendamentos.id });
-
-  return NextResponse.json({ id: registro.id }, { status: 201 });
+  return NextResponse.json({ id: resultado.id, codigo: resultado.codigo }, { status: 201 });
 }
