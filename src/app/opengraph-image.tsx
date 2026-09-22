@@ -40,7 +40,7 @@ export default function Image() {
             color: "#9aa0a6",
           }}
         >
-          Estética automotiva
+          Premium Car Studio
         </div>
         <div
           style={{
