@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { scrollToId } from "@/lib/scroll";
 import { useSelection } from "@/context/SelectionContext";
-import Logo from "./Logo";
+import BrandLogo from "./BrandLogo";
+import BrandLogoCompact from "./BrandLogoCompact";
+import BrandMark from "./BrandMark";
 
 const links = [
   { id: "sobre", label: "Sobre" },
@@ -23,16 +25,27 @@ export default function Header() {
     scrollToId("agendamento");
   }
 
+  const logo = (
+    <>
+      <span className="hidden sm:inline-flex">
+        <BrandLogo className="text-base" />
+      </span>
+      <span className="sm:hidden">
+        <BrandLogoCompact className="text-base" />
+      </span>
+    </>
+  );
+
   return (
     <header className="fixed top-0 z-40 w-full border-b border-white/5 bg-asphalt/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
         {naHome ? (
           <button type="button" onClick={() => scrollToId("hero")} className="transition hover:opacity-80">
-            <Logo className="text-base" />
+            {logo}
           </button>
         ) : (
           <Link href="/" className="transition hover:opacity-80">
-            <Logo className="text-base" />
+            {logo}
           </Link>
         )}
         <nav className="hidden gap-8 text-sm text-text-secondary md:flex">
@@ -51,16 +64,17 @@ export default function Header() {
           <button
             type="button"
             onClick={souAssinante}
-            className="hidden font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 transition hover:text-gold hover:underline md:inline"
+            className="hidden font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 transition hover:text-gold hover:underline lg:inline"
           >
             Sou assinante
           </button>
           <button
             type="button"
             onClick={() => scrollToId("agendamento")}
-            className="rounded-sm bg-gold px-4 py-2 font-heading text-xs font-semibold tracking-wide text-asphalt transition hover:brightness-110"
+            className="flex items-center gap-1.5 rounded-sm bg-gold px-4 py-2.5 font-heading text-xs font-semibold tracking-wide text-asphalt transition hover:brightness-110"
           >
-            ⚡ Agendar
+            <BrandMark className="h-3.5 w-3.5" />
+            Agendar
           </button>
         </div>
       </div>

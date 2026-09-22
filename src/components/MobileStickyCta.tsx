@@ -5,6 +5,7 @@ import { duchaPitstop, precoServico } from "@/lib/data";
 import { formatarPreco } from "@/lib/format";
 import { useSelection } from "@/context/SelectionContext";
 import { scrollToId } from "@/lib/scroll";
+import Bolt from "./Bolt";
 
 export default function MobileStickyCta() {
   const { porteVeiculo, avulsosSelecionados } = useSelection();
@@ -93,8 +94,9 @@ export default function MobileStickyCta() {
           <button
             type="button"
             onClick={() => scrollToId("agendamento")}
-            className="rounded-sm bg-gold px-6 py-3 text-center font-heading text-sm font-semibold tracking-wide text-asphalt"
+            className="flex items-center gap-1.5 rounded-sm bg-gold px-6 py-3 text-center font-heading text-sm font-semibold tracking-wide text-asphalt"
           >
+            <Bolt className="h-3.5 w-3.5" />
             Agendar
           </button>
         </div>
@@ -102,9 +104,10 @@ export default function MobileStickyCta() {
         <button
           type="button"
           onClick={() => scrollToId("agendamento")}
-          className="block w-full rounded-sm bg-gold py-3 text-center font-heading text-sm font-semibold tracking-wide text-asphalt"
+          className="flex w-full items-center justify-center gap-1.5 rounded-sm bg-gold py-3 text-center font-heading text-sm font-semibold tracking-wide text-asphalt"
         >
-          ⚡ Agendar
+          <Bolt className="h-3.5 w-3.5" />
+          Agendar
         </button>
       )}
     </div>

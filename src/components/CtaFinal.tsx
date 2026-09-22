@@ -1,6 +1,7 @@
 "use client";
 
-import Logo from "./Logo";
+import BrandLogo from "./BrandLogo";
+import Bolt from "./Bolt";
 import Reveal from "./Reveal";
 import { scrollToId } from "@/lib/scroll";
 
@@ -8,7 +9,7 @@ export default function CtaFinal() {
   return (
     <section className="bg-surface px-6 py-24">
       <Reveal className="mx-auto max-w-3xl rounded-sm border border-gold/25 bg-panel p-10 text-center">
-        <Logo className="text-xl" />
+        <BrandLogo className="items-center text-xl" />
         <h2 className="mt-4 font-heading text-3xl font-bold md:text-4xl">
           Seu carro. Nosso padrão.
         </h2>
@@ -19,9 +20,10 @@ export default function CtaFinal() {
           <button
             type="button"
             onClick={() => scrollToId("agendamento")}
-            className="rounded-sm bg-gold px-6 py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
+            className="flex items-center justify-center gap-2 rounded-sm bg-gold px-6 py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
           >
-            ⚡ Agendar meu horário
+            <Bolt className="h-3.5 w-3.5" />
+            Agendar meu horário
           </button>
           <button
             type="button"

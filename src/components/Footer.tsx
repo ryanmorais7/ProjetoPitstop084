@@ -1,7 +1,7 @@
 "use client";
 
 import { scrollToId } from "@/lib/scroll";
-import Logo from "./Logo";
+import BrandLogo from "./BrandLogo";
 
 const links = [
   { id: "sobre", label: "Sobre" },
@@ -17,7 +17,7 @@ export default function Footer() {
     <footer className="border-t border-white/10 px-6 pt-10 pb-28 md:pb-10">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
-          <Logo className="text-base" />
+          <BrandLogo className="items-center text-base sm:items-start" />
           <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-text-secondary">
             {links.map((link) => (
               <button

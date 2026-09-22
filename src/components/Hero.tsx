@@ -85,9 +85,10 @@ export default function Hero() {
             <button
               type="button"
               onClick={() => scrollToId("agendamento")}
-              className="rounded-sm bg-gold px-7 py-4 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
+              className="flex items-center gap-2 rounded-sm bg-gold px-7 py-4 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
             >
-              ⚡ Agendar meu horário
+              <Bolt className="h-4 w-4" />
+              Agendar meu horário
             </button>
             <button
               type="button"
