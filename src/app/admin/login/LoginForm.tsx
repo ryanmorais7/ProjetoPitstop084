@@ -10,7 +10,7 @@ export default function LoginForm() {
 
   return (
     <form action={formAction} className="w-full max-w-sm rounded-sm border border-white/10 bg-panel p-8">
-      <p className="font-heading text-xs font-bold uppercase tracking-[0.2em] text-gold">Pitstop 084</p>
+      <p className="font-heading text-xs font-bold uppercase tracking-[0.2em] text-gold">PitStop084</p>
       <h1 className="mt-1 font-heading text-2xl font-bold">Painel administrativo</h1>
       <p className="mt-2 text-sm text-text-secondary">Entre com a senha do painel.</p>
 

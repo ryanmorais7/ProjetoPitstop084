@@ -1,5 +1,6 @@
 import { Plano, VehicleSize } from "@/lib/data";
 import { formatarPrecoPartes } from "@/lib/format";
+import Bolt from "./Bolt";
 
 const estilosPorPlano: Record<
   Plano["id"],
@@ -61,13 +62,13 @@ export default function PlanoCard({
       </p>
       <p className={`mt-3 text-sm ${textoSecundario}`}>{plano.headline}</p>
 
-      <ul className="mt-5 space-y-2 text-sm">
+      <ul className="mt-5 mb-8 space-y-2.5 text-sm">
         {plano.beneficios.map((item) => (
           <li
             key={item}
-            className={`flex items-start gap-2 ${plano.id === "diamante" ? "text-light-text" : "text-white"}`}
+            className={`flex items-start gap-2 leading-relaxed ${plano.id === "diamante" ? "text-light-text" : "text-white"}`}
           >
-            <span className={`mt-0.5 ${estilo.check}`}>⚡</span>
+            <Bolt className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${estilo.check}`} />
             {item}
           </li>
         ))}

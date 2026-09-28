@@ -30,7 +30,7 @@ export default function Image() {
             letterSpacing: -2,
           }}
         >
-          <span>PITSTOP 084</span>
+          <span>PITSTOP084</span>
           <span style={{ color: "#d9a441" }}>⚡</span>
         </div>
         <div

@@ -21,9 +21,9 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 });
 
-const titulo = "Pitstop 084 · Premium Car Studio";
+const titulo = "PitStop084 · Premium Car Studio";
 const descricao =
-  "Pitstop 084, Premium Car Studio. Lavagem detalhada, higienização e cuidado técnico com hora marcada, por assinatura ou avulso.";
+  "PitStop084, Premium Car Studio. Lavagem detalhada, higienização e cuidado técnico com hora marcada, por assinatura ou avulso.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://projetopitstop084.vercel.app"),

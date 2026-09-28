@@ -14,7 +14,7 @@ export default function CtaFinal() {
           Seu carro. Nosso padrão.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-text-secondary">
-          Escolha seu cuidado, reserve seu horário e deixe o resto com a Pitstop 084.
+          Escolha seu cuidado, reserve seu horário e deixe o resto com a PitStop084.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <button

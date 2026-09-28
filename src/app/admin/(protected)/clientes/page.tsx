@@ -4,6 +4,7 @@ import { assinaturas } from "@/db/schema";
 import { db } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { planos, PlanoId } from "@/lib/data";
+import ClienteBadge from "@/components/admin/ClienteBadge";
 
 export default async function ClientesPage({
   searchParams,
@@ -77,13 +78,7 @@ export default async function ClientesPage({
                   {cliente.codigo} · {cliente.telefone}
                 </p>
               </div>
-              <span
-                className={`shrink-0 rounded-sm px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${
-                  nomePlano ? "bg-gold text-asphalt" : "bg-white/10 text-text-secondary"
-                }`}
-              >
-                {nomePlano ? `PitPass · ${nomePlano}` : "Pitstop 084"}
-              </span>
+              <ClienteBadge nomePlano={nomePlano} className="shrink-0" />
             </Link>
           );
         })}

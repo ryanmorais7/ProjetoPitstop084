@@ -65,7 +65,7 @@ export const planos: Record<PlanoId, Plano> = {
     id: "diamante",
     nome: "Diamante",
     headline:
-      "O cuidado mais completo da Pitstop 084 para quem não abre mão de ter o carro sempre impecável.",
+      "O cuidado mais completo da PitStop084 para quem não abre mão de ter o carro sempre impecável.",
     precos: { P: 329.9, G: 389.9 },
     beneficios: [
       "1 Lavagem Diamante mensal",
@@ -249,7 +249,7 @@ export function linkWhatsapp(mensagem: string) {
 }
 
 export const enderecoPitstop = {
-  nome: "Pitstop 084",
+  nome: "PitStop084",
   linha1: "Av. Presidente Café Filho, 522",
   linha2: "Praia do Meio",
   linha3: "Natal - RN",
@@ -284,6 +284,24 @@ export const horariosAgendamento = [
 export const beneficiosAgendaveis: Record<string, string> = {
   "Lavagem Black": "Seu cuidado recorrente para manter o carro limpo e apresentável durante a semana.",
   "Lavagem Gold": "Tratamento completo de conservação e proteção do veículo.",
-  "Lavagem Diamante": "O cuidado mais completo da Pitstop 084 para o seu carro.",
+  "Lavagem Diamante": "O cuidado mais completo da PitStop084 para o seu carro.",
   "Manutenção": "Cuidado periódico para manter o padrão da sua lavagem em dia.",
 };
+
+/**
+ * "Ideal para" de cada benefício — ajuda o assinante a diferenciar as opções na hora de escolher.
+ * Paráfrase direta da descrição em `beneficiosAgendaveis` acima, sem inventar procedimento técnico novo.
+ */
+export const idealParaBeneficio: Record<string, string> = {
+  "Lavagem Black": "Quando você quer manter o carro limpo e apresentável no dia a dia.",
+  "Lavagem Gold": "Quando você quer um cuidado mais completo de conservação e proteção.",
+  "Lavagem Diamante": "Quando você quer o tratamento mais completo disponível no seu plano.",
+  "Manutenção": "Quando você quer manter o padrão da sua lavagem em dia entre um cuidado maior e outro.",
+};
+
+/** Descreve a cota real de um benefício (de `regrasBeneficios`), sem inventar número nenhum. */
+export function formatarRegraBeneficio(regra: { tipo: "ciclo" | "semanal"; limite: number | null }): string {
+  if (regra.limite === null) return "Ilimitado nesta semana";
+  if (regra.tipo === "semanal") return regra.limite === 1 ? "1x por semana" : `Até ${regra.limite}x por semana`;
+  return regra.limite === 1 ? "1x por ciclo" : `Até ${regra.limite}x por ciclo`;
+}

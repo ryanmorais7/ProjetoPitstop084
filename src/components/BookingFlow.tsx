@@ -10,6 +10,9 @@ import {
   servicosPorPlano,
   beneficiosAgendaveis,
   itensInclusosBeneficio,
+  idealParaBeneficio,
+  regrasBeneficios,
+  formatarRegraBeneficio,
   portesVeiculo,
   precoServico,
   etapasAgendamento,
@@ -357,29 +360,45 @@ export default function BookingFlow() {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                {servicosPorPlano[plano.id].map((nome) => (
-                  <button
-                    key={nome}
-                    type="button"
-                    onClick={() => escolherBeneficio(nome)}
-                    className="rounded-sm border border-white/10 bg-asphalt p-5 text-left transition hover:border-gold"
-                  >
-                    <span className="font-heading text-base font-bold">{nome}</span>
-                    {beneficiosAgendaveis[nome] && (
-                      <p className="mt-1 text-sm text-text-secondary">{beneficiosAgendaveis[nome]}</p>
-                    )}
-                    {itensInclusosBeneficio[nome]?.length > 0 && (
-                      <div className="mt-2">
-                        <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Inclui</p>
-                        <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
-                          {itensInclusosBeneficio[nome].map((item) => (
-                            <li key={item}>• {item}</li>
-                          ))}
-                        </ul>
+                {servicosPorPlano[plano.id].map((nome) => {
+                  const regra = regrasBeneficios[plano.id][nome];
+                  return (
+                    <button
+                      key={nome}
+                      type="button"
+                      onClick={() => escolherBeneficio(nome)}
+                      className="flex flex-col rounded-sm border border-white/10 bg-asphalt p-5 text-left transition hover:border-gold"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-heading text-base font-bold">{nome}</span>
+                        {regra && (
+                          <span className="shrink-0 rounded-sm bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-secondary">
+                            {formatarRegraBeneficio(regra)}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </button>
-                ))}
+                      {beneficiosAgendaveis[nome] && (
+                        <p className="mt-1 text-sm text-text-secondary">{beneficiosAgendaveis[nome]}</p>
+                      )}
+                      {idealParaBeneficio[nome] && (
+                        <div className="mt-3">
+                          <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Ideal para</p>
+                          <p className="mt-0.5 text-xs text-text-secondary">{idealParaBeneficio[nome]}</p>
+                        </div>
+                      )}
+                      {itensInclusosBeneficio[nome]?.length > 0 && (
+                        <div className="mt-3">
+                          <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Inclui</p>
+                          <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
+                            {itensInclusosBeneficio[nome].map((item) => (
+                              <li key={item}>• {item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
               <button
                 type="button"
@@ -573,7 +592,6 @@ export default function BookingFlow() {
                         ...avulsosSelecionados.filter((s) => !s.requiresEvaluation).map((s) => s.nome),
                       ]
                     : [plano?.nome, beneficioSelecionado].filter((v): v is string => Boolean(v));
-                const selo = tipoAtendimento === "avulso" ? "AGENDAMENTO" : plano?.nome.toUpperCase() ?? "";
                 const mensagemWhats =
                   tipoAtendimento === "avulso"
                     ? mensagemAgendamentoAvulso({
@@ -606,13 +624,15 @@ export default function BookingFlow() {
 
                     <div className="mt-6">
                       <PitPass
-                        selo={selo}
-                        planoId={plano?.id}
+                        tipoAtendimento={tipoAtendimento ?? "avulso"}
+                        planoNome={plano?.nome}
+                        nome={nome}
                         carro={carro}
                         porteNome={porte.nome}
                         dataIso={slotSelecionado.dia}
                         horario={slotSelecionado.hora}
                         servicos={servicosPitpass}
+                        beneficio={tipoAtendimento === "assinatura" ? beneficioSelecionado : null}
                         codigo={codigo}
                       />
                     </div>

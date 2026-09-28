@@ -24,7 +24,7 @@ export function mensagemAgendamentoAvulso({
   observacoes?: string | null;
 }): string {
   const linhas = [
-    "🚘✨ Novo agendamento PitStop 084",
+    "\u{1F697}\u{2728} Novo agendamento PitStop084",
     "",
     `Cliente: ${nome}`,
     `Veículo: ${veiculo} • ${porteNome}`,
@@ -33,7 +33,7 @@ export function mensagemAgendamentoAvulso({
     `Código: ${codigo}`,
   ];
   if (observacoes) linhas.push("", `Obs.: ${observacoes}`);
-  linhas.push("", "Agendamento realizado pelo site.", "Até lá! 🟡⚫");
+  linhas.push("", "Agendamento realizado pelo site.", "Até lá! \u{1F7E1}\u{26AB}");
   return linhas.join("\n");
 }
 
@@ -59,7 +59,7 @@ export function mensagemAgendamentoPitPass({
   observacoes?: string | null;
 }): string {
   const linhas = [
-    `💎 Novo agendamento PitPass • ${plano.toUpperCase()}`,
+    `\u{1F48E} Novo agendamento PitPass • ${plano.toUpperCase()}`,
     "",
     `Cliente: ${nome}`,
     `Veículo: ${veiculo} • ${porteNome}`,
@@ -68,6 +68,6 @@ export function mensagemAgendamentoPitPass({
     `Código: ${codigo}`,
   ];
   if (observacoes) linhas.push("", `Obs.: ${observacoes}`);
-  linhas.push("", "PitPass identificado.", "Até lá! 🟡⚫");
+  linhas.push("", "PitPass identificado.", "Até lá! \u{1F7E1}\u{26AB}");
   return linhas.join("\n");
 }

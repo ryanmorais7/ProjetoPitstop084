@@ -6,6 +6,7 @@ import { formatarPreco } from "@/lib/format";
 import { formatarDataCurta } from "@/lib/agenda";
 import { planos, PlanoId, listaPlanos, linkWhatsapp } from "@/lib/data";
 import CarSparkMark from "@/components/CarSparkMark";
+import ClienteBadge from "@/components/admin/ClienteBadge";
 import {
   editarCliente,
   adicionarPreferencia,
@@ -43,13 +44,7 @@ export default async function FichaClientePage({ params }: { params: Promise<{ i
         <div>
           <h1 className="font-heading text-2xl font-bold">{cliente.nome}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-sm px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${
-                nomePlano ? "bg-gold text-asphalt" : "bg-white/10 text-text-secondary"
-              }`}
-            >
-              {nomePlano ? `Cliente PitPass · ${nomePlano}` : "Cliente Pitstop 084"}
-            </span>
+            <ClienteBadge nomePlano={nomePlano} />
             <span className="font-mono text-xs text-text-secondary">{cliente.codigo}</span>
           </div>
         </div>
@@ -71,7 +66,7 @@ export default async function FichaClientePage({ params }: { params: Promise<{ i
           <div className="flex items-center gap-2">
             <CarSparkMark className="h-5 w-5 text-white" />
             <span className="font-heading text-xs font-bold tracking-[0.15em]">
-              {nomePlano ? `PITPASS ${nomePlano.toUpperCase()}` : "PITSTOP 084"}
+              {nomePlano ? `PITPASS • ${nomePlano.toUpperCase()}` : "PITSTOP084"}
             </span>
           </div>
           <span className="font-mono text-[10px] text-text-secondary">P084</span>
@@ -255,7 +250,7 @@ export default async function FichaClientePage({ params }: { params: Promise<{ i
           </button>
         </form>
         <a
-          href={linkWhatsapp(`Olá ${cliente.nome}! Aqui é da Pitstop 084.`)}
+          href={linkWhatsapp(`Olá ${cliente.nome}! Aqui é da PitStop084.`)}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-block font-mono text-xs uppercase tracking-wide text-gold underline-offset-4 hover:underline"
@@ -277,7 +272,13 @@ export default async function FichaClientePage({ params }: { params: Promise<{ i
                   <span className={`text-xs uppercase ${estiloStatusAgendamento[h.status] ?? ""}`}>{h.status}</span>
                 </p>
                 <p className="text-sm text-text-primary">{h.servicoNome}</p>
-                {h.preco && <p className="font-mono text-xs text-gold">{formatarPreco(Number(h.preco))}</p>}
+                {h.tipoAtendimento === "assinatura" ? (
+                  <p className="font-mono text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                    Benefício do plano
+                  </p>
+                ) : (
+                  h.preco && <p className="font-mono text-xs text-gold">{formatarPreco(Number(h.preco))}</p>
+                )}
                 {h.observacoes && <p className="mt-1 text-xs text-text-secondary">Obs.: {h.observacoes}</p>}
               </div>
               {h.status === "confirmado" && (

@@ -6,6 +6,7 @@ import { hojeIso, formatarDataCurta } from "@/lib/agenda";
 import { formatarPreco } from "@/lib/format";
 import { linkWhatsapp, planos, PlanoId } from "@/lib/data";
 import { atualizarStatusAgendamento } from "../../actions";
+import ClienteBadge from "@/components/admin/ClienteBadge";
 
 interface AdicionalJson {
   id: string;
@@ -15,8 +16,7 @@ interface AdicionalJson {
 
 function descreverServicos(registro: typeof agendamentos.$inferSelect): string {
   if (registro.tipoAtendimento === "assinatura") {
-    const plano = registro.plano ? registro.plano.toUpperCase() : "—";
-    return registro.servicoNome ? `${plano} · ${registro.servicoNome}` : plano;
+    return registro.servicoNome ?? (registro.plano ? registro.plano.toUpperCase() : "—");
   }
 
   const partes = [registro.servicoNome ?? "Ducha Pitstop"];
@@ -115,24 +115,24 @@ export default async function AgendamentosPage({
                   <p className="mt-1 font-heading text-base font-bold">{r.nome}</p>
                 )}
 
-                <span
-                  className={`mt-1 inline-block rounded-sm px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${
-                    nomePlano ? "bg-gold text-asphalt" : "bg-white/10 text-text-secondary"
-                  }`}
-                >
-                  {nomePlano ? `Cliente PitPass · ${nomePlano}` : "Cliente Pitstop 084"}
-                </span>
+                <ClienteBadge nomePlano={nomePlano} className="mt-1 inline-block" />
 
                 <p className="mt-1 text-sm text-text-secondary">
                   {r.carro}
                   {r.placa ? ` · ${r.placa}` : ""} · {r.categoriaVeiculo === "G" ? "SUV / Pick-up" : "Hatch / Sedan"}
                 </p>
                 <p className="mt-1 text-sm text-text-primary">{descreverServicos(r)}</p>
-                {r.preco && (
-                  <p className="mt-1 font-mono text-sm text-gold">{formatarPreco(Number(r.preco))}</p>
+                {r.tipoAtendimento === "assinatura" ? (
+                  <p className="mt-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                    Benefício do plano
+                  </p>
+                ) : (
+                  r.preco && (
+                    <p className="mt-1 font-mono text-sm text-gold">{formatarPreco(Number(r.preco))}</p>
+                  )
                 )}
                 <a
-                  href={linkWhatsapp(`Olá ${r.nome}! Aqui é da Pitstop 084, sobre seu agendamento.`)}
+                  href={linkWhatsapp(`Olá ${r.nome}! Aqui é da PitStop084, sobre seu agendamento.`)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-1 inline-block font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 hover:text-gold hover:underline"

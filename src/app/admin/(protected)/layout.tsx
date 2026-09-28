@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-6">
             <span className="font-heading text-sm font-bold uppercase tracking-widest">
-              Pitstop 084 · Admin
+              PitStop084 · Admin
             </span>
             <nav className="flex items-center gap-4 font-mono text-xs uppercase tracking-wide text-text-secondary">
               <Link href="/admin/agendamentos" className="transition hover:text-gold">

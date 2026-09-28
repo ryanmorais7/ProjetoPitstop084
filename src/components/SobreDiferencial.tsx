@@ -20,7 +20,7 @@ export default function SobreDiferencial() {
             Não é só lavar. É cuidar.
           </h2>
           <p className="mt-4 max-w-md text-light-text-secondary">
-            Na Pitstop 084, cada veículo recebe atenção aos detalhes, cuidado e um padrão pensado
+            Na PitStop084, cada veículo recebe atenção aos detalhes, cuidado e um padrão pensado
             para quem valoriza o próprio carro.
           </p>
 
