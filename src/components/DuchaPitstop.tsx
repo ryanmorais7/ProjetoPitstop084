@@ -13,7 +13,7 @@ export default function DuchaPitstop() {
   const precoDucha = precoServico(duchaPitstop, porteVeiculo);
 
   return (
-    <section id="servicos" className="px-6 py-24">
+    <section id="servicos" className="px-6 py-16 md:py-24">
       <div className="mx-auto max-w-5xl">
         <Reveal>
           <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">

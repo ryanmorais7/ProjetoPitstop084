@@ -7,6 +7,7 @@ import { formatarPreco } from "@/lib/format";
 import { linkWhatsapp, planos, PlanoId } from "@/lib/data";
 import { atualizarStatusAgendamento } from "../../actions";
 import ClienteBadge from "@/components/admin/ClienteBadge";
+import { etapaAtendimento, rotuloEtapa, formatarHoraFortaleza } from "@/lib/pitpass";
 
 interface AdicionalJson {
   id: string;
@@ -16,7 +17,7 @@ interface AdicionalJson {
 
 function descreverServicos(registro: typeof agendamentos.$inferSelect): string {
   if (registro.tipoAtendimento === "assinatura") {
-    return registro.servicoNome ?? (registro.plano ? registro.plano.toUpperCase() : "—");
+    return registro.servicoNome ?? (registro.plano ? registro.plano.toUpperCase() : "-");
   }
 
   const partes = [registro.servicoNome ?? "Ducha Pitstop"];
@@ -96,13 +97,30 @@ export default async function AgendamentosPage({
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm">
-                  {r.codigo && <span className="text-white">{r.codigo}</span>}
+                  {r.codigo && (
+                    <Link href={`/admin/atendimentos/${r.id}`} className="text-white hover:text-gold">
+                      {r.codigo}
+                    </Link>
+                  )}
                   <span className="text-text-secondary">·</span>
                   <span className="text-gold">{formatarDataCurta(r.dia)}</span>
                   <span className="text-text-secondary">·</span>
                   <span>{r.horario}</span>
-                  <span className={`text-xs uppercase ${estiloStatus[r.status] ?? ""}`}>{r.status}</span>
+                  <span className={`text-xs uppercase ${estiloStatus[r.status] ?? ""}`}>
+                    {r.status === "confirmado" ? rotuloEtapa[etapaAtendimento(r)] : r.status}
+                  </span>
                 </div>
+                {(r.checkedInAt || r.startedAt || r.completedAt) && (
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-text-secondary">
+                    {[
+                      r.checkedInAt && `Check-in ${formatarHoraFortaleza(r.checkedInAt)}`,
+                      r.startedAt && `Início ${formatarHoraFortaleza(r.startedAt)}`,
+                      r.completedAt && `Concluído ${formatarHoraFortaleza(r.completedAt)}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
 
                 {r.clienteId ? (
                   <Link
@@ -142,7 +160,13 @@ export default async function AgendamentosPage({
               </div>
 
               {r.status === "confirmado" && (
-                <div className="mt-4 flex shrink-0 gap-2 sm:mt-0">
+                <div className="mt-4 flex shrink-0 flex-wrap gap-2 sm:mt-0">
+                  <Link
+                    href={`/admin/atendimentos/${r.id}`}
+                    className="rounded-sm border border-gold/60 px-4 py-2 font-mono text-xs uppercase tracking-wide text-gold transition hover:bg-gold hover:text-asphalt"
+                  >
+                    {etapaAtendimento(r) === "aguardando" ? "Check-in" : "Abrir ficha"}
+                  </Link>
                   <form action={atualizarStatusAgendamento.bind(null, r.id, "concluido")}>
                     <button
                       type="submit"

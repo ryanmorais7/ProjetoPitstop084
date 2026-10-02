@@ -11,5 +11,6 @@ export function scrollToId(id: string) {
   const elemento = document.getElementById(id);
   if (!elemento) return;
   const top = elemento.getBoundingClientRect().top + window.scrollY - ALTURA_HEADER;
-  window.scrollTo({ top, behavior: "smooth" });
+  const reduzirMovimento = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top, behavior: reduzirMovimento ? "auto" : "smooth" });
 }

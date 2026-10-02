@@ -36,7 +36,7 @@ export default async function NovoClientePage({
       {resultados.length > 0 && (
         <div className="mt-4 space-y-2">
           <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
-            Já existe alguém parecido — confira antes de continuar:
+            Já existe alguém parecido. Confira antes de continuar:
           </p>
           {resultados.map((cliente) => (
             <Link

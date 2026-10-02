@@ -14,6 +14,7 @@ import {
 } from "@/lib/data";
 import { hojeIso, dataValidaParaAgendar } from "@/lib/agenda";
 import { criarAgendamento, buscarClientePorTelefone, verificarBeneficioDisponivel } from "@/lib/bookings";
+import { urlCheckin } from "@/lib/checkin";
 
 export async function GET() {
   const [ocupados, bloqueados] = await Promise.all([
@@ -151,5 +152,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ erro: resultado.erro }, { status: resultado.status });
   }
 
-  return NextResponse.json({ id: resultado.id, codigo: resultado.codigo }, { status: 201 });
+  // O QR leva só a URL pública com o token, nunca dados pessoais.
+  const checkinUrl = urlCheckin(new URL(request.url).origin, resultado.checkinToken);
+
+  return NextResponse.json({ id: resultado.id, codigo: resultado.codigo, checkinUrl }, { status: 201 });
 }

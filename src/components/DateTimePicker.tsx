@@ -43,7 +43,7 @@ export default function DateTimePicker({
               type="button"
               onClick={() => onSelecionarData(iso)}
               aria-pressed={ativo}
-              className={`flex shrink-0 flex-col items-center rounded-sm px-4 py-2 font-heading transition ${
+              className={`flex shrink-0 flex-col items-center rounded-sm px-4 py-2 font-heading transition-colors duration-200 ${
                 ativo ? "bg-gold text-asphalt" : "bg-asphalt text-text-secondary hover:text-text-primary"
               }`}
             >
@@ -86,16 +86,17 @@ export default function DateTimePicker({
                 type="button"
                 disabled={indisponivel}
                 onClick={() => onSelecionarHora(hora)}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-sm px-3 py-3 font-mono text-sm transition ${
+                aria-pressed={selecionado}
+                className={`flex flex-col items-center justify-center gap-0.5 rounded-sm border px-3 py-3 font-mono text-sm transition-colors duration-200 ${
                   indisponivel
-                    ? "cursor-not-allowed bg-white/5 text-text-secondary/40"
+                    ? "cursor-not-allowed border-transparent bg-white/5 text-text-secondary/40"
                     : selecionado
-                    ? "bg-gold text-asphalt"
-                    : "bg-asphalt text-text-primary hover:border hover:border-gold hover:text-gold"
+                    ? "border-gold bg-gold font-semibold text-asphalt"
+                    : "border-transparent bg-asphalt text-text-primary hover:border-gold hover:text-gold"
                 }`}
               >
                 <span>
-                  {selecionado && "✓ "}
+                  {selecionado && <span className="check-entra mr-1 inline-block">✓</span>}
                   {hora}
                 </span>
                 {ocupado && <span className="text-[10px] uppercase tracking-wide">Ocupado</span>}

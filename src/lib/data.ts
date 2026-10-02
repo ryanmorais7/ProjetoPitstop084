@@ -255,7 +255,14 @@ export const enderecoPitstop = {
   linha3: "Natal - RN",
 };
 
-const enderecoCompleto = `${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}, ${enderecoPitstop.linha3}`;
+/**
+ * Foto REAL da fachada, pra ajudar o cliente a reconhecer a loja ao chegar. Enquanto for null,
+ * a seção de localização segue sem foto em produção (em desenvolvimento aparece um espaço reservado).
+ * Pra ativar: coloque o arquivo em /public (ex.: /fachada-pitstop084.jpg) e preencha abaixo.
+ */
+export const fotoFachada: { src: string; alt: string } | null = null;
+
+const enderecoCompleto =`${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}, ${enderecoPitstop.linha3}`;
 
 export const linkComoChegar = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
   enderecoCompleto

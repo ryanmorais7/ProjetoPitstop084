@@ -5,7 +5,6 @@ import {
   duchaPitstop,
   planos,
   listaPlanos,
-  listaPortesVeiculo,
   PlanoId,
   servicosPorPlano,
   beneficiosAgendaveis,
@@ -28,24 +27,29 @@ import { scrollToId } from "@/lib/scroll";
 import DateTimePicker from "./DateTimePicker";
 import PitPass from "./PitPass";
 import Bolt from "./Bolt";
+import { VehicleSizeSelector } from "./VehicleSizeSelector";
 
-type Etapa = "tipo" | "plano" | "porte" | "beneficio" | "horario" | "ficha" | "confirmacao";
+type Etapa = "tipo" | "plano" | "veiculo" | "beneficio" | "horario" | "ficha" | "confirmacao";
 
 interface Slot {
   dia: string;
   hora: string;
 }
 
+/**
+ * Próxima etapa a partir do que já se sabe. O porte nunca é presumido: se o visitante não
+ * escolheu em nenhum lugar da landing, o agendamento pergunta antes do horário.
+ */
 function etapaInicial(
   tipo: TipoAtendimento | null,
   planoId: PlanoId | null,
   beneficio: string | null,
   porteDefinido: boolean
 ): Etapa {
-  if (tipo === "avulso") return "horario";
+  if (tipo === "avulso") return porteDefinido ? "horario" : "veiculo";
   if (tipo === "assinatura") {
     if (!planoId) return "plano";
-    if (!porteDefinido) return "porte";
+    if (!porteDefinido) return "veiculo";
     if (!beneficio) return "beneficio";
     return "horario";
   }
@@ -60,13 +64,15 @@ export default function BookingFlow() {
     planoSelecionado,
     selecionarPlano,
     porteVeiculo,
-    definirPorteVeiculo,
     porteDefinidoPeloUsuario,
     reiniciarSelecao,
   } = useSelection();
 
   const [beneficioSelecionado, setBeneficioSelecionado] = useState<string | null>(null);
-  const [reserva, setReserva] = useState<{ id: number; codigo: string } | null>(null);
+  const [reserva, setReserva] = useState<{ id: number; codigo: string; checkinUrl?: string } | null>(null);
+  const [trocandoVeiculo, setTrocandoVeiculo] = useState(false);
+  const [beneficiosPlanoAbertos, setBeneficiosPlanoAbertos] = useState(false);
+  const [detalheBeneficio, setDetalheBeneficio] = useState<string | null>(null);
   const [etapa, setEtapa] = useState<Etapa>(() =>
     etapaInicial(tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario)
   );
@@ -102,7 +108,7 @@ export default function BookingFlow() {
     const alvo = etapaInicial(tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario);
     if (
       alvo !== "tipo" &&
-      (etapa === "tipo" || etapa === "plano" || etapa === "porte" || etapa === "beneficio")
+      (etapa === "tipo" || etapa === "plano" || etapa === "veiculo" || etapa === "beneficio")
     ) {
       setEtapa(alvo);
     }
@@ -124,7 +130,7 @@ export default function BookingFlow() {
   const indiceVisivel: Record<Etapa, number> = {
     tipo: 0,
     plano: 1,
-    porte: 1,
+    veiculo: 1,
     beneficio: 1,
     horario: 2,
     ficha: 3,
@@ -142,6 +148,15 @@ export default function BookingFlow() {
   function escolherBeneficio(nome: string) {
     setBeneficioSelecionado(nome);
     setEtapa("horario");
+  }
+
+  /** Depois de escolher o veículo na etapa dedicada (inclusive quando voltou pra trocar). */
+  function continuarAposVeiculo() {
+    if (tipoAtendimento === "assinatura" && plano && servicosPorPlano[plano.id].length > 1) {
+      setEtapa("beneficio");
+    } else {
+      setEtapa("horario");
+    }
   }
 
   function selecionarSlot(hora: string) {
@@ -188,7 +203,7 @@ export default function BookingFlow() {
         setErro(corpo?.erro ?? "Não foi possível confirmar o agendamento agora. Tente novamente.");
         return;
       }
-      const dados: { id: number; codigo: string } = await resposta.json();
+      const dados: { id: number; codigo: string; checkinUrl?: string } = await resposta.json();
       setReserva(dados);
       setEtapa("confirmacao");
     } catch {
@@ -206,12 +221,15 @@ export default function BookingFlow() {
     setPlaca("");
     setBeneficioSelecionado(null);
     setReserva(null);
+    setTrocandoVeiculo(false);
+    setBeneficiosPlanoAbertos(false);
+    setDetalheBeneficio(null);
     setEtapa("tipo");
     reiniciarSelecao();
   }
 
   return (
-    <section id="agendamento" className="bg-light px-6 py-24">
+    <section id="agendamento" className="bg-light px-6 py-16 md:py-24">
       <div className="mx-auto max-w-3xl">
         <div className="mb-10">
           <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-light-text-secondary">
@@ -222,7 +240,7 @@ export default function BookingFlow() {
             Seu Pitstop começa aqui.
           </h2>
           <p className="mt-3 text-light-text-secondary">
-            Escolha o horário e deixe o resto com a gente.
+            Escolha como quer cuidar do seu carro e marque seu horário.
           </p>
         </div>
 
@@ -252,7 +270,8 @@ export default function BookingFlow() {
           </div>
         )}
 
-        <div className="rounded-sm border border-white/10 bg-panel p-8">
+        <div className="rounded-sm border border-white/10 bg-panel p-5 sm:p-8">
+          <div key={etapa} className="passo-entra">
           {etapa === "tipo" && (
             <div>
               <h3 className="font-heading text-xl font-bold">Como você quer agendar?</h3>
@@ -260,17 +279,21 @@ export default function BookingFlow() {
                 <button
                   type="button"
                   onClick={() => escolherTipo("avulso")}
-                  className="rounded-sm border border-white/10 bg-asphalt p-6 text-left transition hover:border-gold"
+                  className="rounded-sm border border-white/10 bg-asphalt p-5 text-left transition-colors duration-200 hover:border-gold sm:p-6"
                 >
                   <span className="font-heading text-lg font-bold">Ducha Pitstop</span>
                   <p className="mt-2 text-sm text-text-secondary">
-                    Agendo agora, sem compromisso — dá pra adicionar cuidados na hora.
+                    {avulsosSelecionados.length > 0
+                      ? `Sua Ducha com ${avulsosSelecionados.length} cuidado${
+                          avulsosSelecionados.length > 1 ? "s" : ""
+                        } que você já escolheu. Agora é só marcar o horário.`
+                      : "Agende sua Ducha agora. Se quiser, você pode adicionar outros cuidados."}
                   </p>
                 </button>
                 <button
                   type="button"
                   onClick={() => escolherTipo("assinatura")}
-                  className="rounded-sm border border-white/10 bg-asphalt p-6 text-left transition hover:border-gold"
+                  className="rounded-sm border border-white/10 bg-asphalt p-5 text-left transition-colors duration-200 hover:border-gold sm:p-6"
                 >
                   <span className="font-heading text-lg font-bold">Sou assinante</span>
                   <p className="mt-2 text-sm text-text-secondary">
@@ -313,27 +336,21 @@ export default function BookingFlow() {
             </div>
           )}
 
-          {etapa === "porte" && (
+          {etapa === "veiculo" && (
             <div>
-              <h3 className="font-heading text-xl font-bold">Qual é o seu veículo?</h3>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {listaPortesVeiculo.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => definirPorteVeiculo(p.id)}
-                    className="rounded-sm border border-white/10 bg-asphalt p-6 text-left transition hover:border-gold"
-                  >
-                    <span className="block font-heading text-base font-bold">{p.nome}</span>
-                    <span className="block font-mono text-xs uppercase tracking-wide text-text-secondary">
-                      {p.descricao}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <h3 className="font-heading text-xl font-bold">Qual é o seu tipo de veículo?</h3>
+              <p className="mt-1 text-sm text-text-secondary">
+                O porte define o valor do seu cuidado. Você pode trocar depois.
+              </p>
+              <VehicleSizeSelector
+                className="mt-6"
+                semTitulo
+                exigirEscolha
+                onEscolher={continuarAposVeiculo}
+              />
               <button
                 type="button"
-                onClick={() => setEtapa("plano")}
+                onClick={() => setEtapa(tipoAtendimento === "assinatura" ? "plano" : "tipo")}
                 className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
               >
                 Voltar
@@ -344,65 +361,109 @@ export default function BookingFlow() {
           {etapa === "beneficio" && plano && (
             <div>
               <h3 className="font-heading text-xl font-bold">O que você quer usar?</h3>
-              <p className="mt-1 mb-6 text-sm text-text-secondary">
+              <p className="mt-1 mb-5 text-sm text-text-secondary">
                 Plano: <span className="text-gold">{plano.nome}</span> · {porte.nome}
               </p>
 
-              <div className="mb-6 rounded-sm border border-white/10 bg-asphalt p-4">
-                <p className="font-heading text-xs font-bold uppercase tracking-[0.2em] text-gold">
-                  Seu {plano.nome}
-                </p>
-                <ul className="mt-2 space-y-1 text-sm text-text-secondary">
-                  {plano.beneficios.map((b) => (
-                    <li key={b}>• {b}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {servicosPorPlano[plano.id].map((nome) => {
                   const regra = regrasBeneficios[plano.id][nome];
+                  const aberto = detalheBeneficio === nome;
+                  const temDetalhes = Boolean(idealParaBeneficio[nome]) || itensInclusosBeneficio[nome]?.length > 0;
                   return (
-                    <button
+                    <div
                       key={nome}
-                      type="button"
-                      onClick={() => escolherBeneficio(nome)}
-                      className="flex flex-col rounded-sm border border-white/10 bg-asphalt p-5 text-left transition hover:border-gold"
+                      className="flex flex-col rounded-sm border border-white/10 bg-asphalt transition-colors duration-200 hover:border-gold/60"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-heading text-base font-bold">{nome}</span>
-                        {regra && (
-                          <span className="shrink-0 rounded-sm bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-secondary">
-                            {formatarRegraBeneficio(regra)}
-                          </span>
+                      <button
+                        type="button"
+                        onClick={() => escolherBeneficio(nome)}
+                        className="flex flex-col p-4 text-left sm:p-5"
+                      >
+                        <div className="flex w-full items-start justify-between gap-2">
+                          <span className="font-heading text-base font-bold">{nome}</span>
+                          {regra && (
+                            <span className="shrink-0 rounded-sm bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-secondary">
+                              {formatarRegraBeneficio(regra)}
+                            </span>
+                          )}
+                        </div>
+                        {beneficiosAgendaveis[nome] && (
+                          <p className="mt-1 text-sm text-text-secondary">{beneficiosAgendaveis[nome]}</p>
                         )}
-                      </div>
-                      {beneficiosAgendaveis[nome] && (
-                        <p className="mt-1 text-sm text-text-secondary">{beneficiosAgendaveis[nome]}</p>
+                        <span className="mt-3 font-mono text-[11px] uppercase tracking-widest text-gold">
+                          Usar este benefício →
+                        </span>
+                      </button>
+
+                      {temDetalhes && (
+                        <>
+                          <div className="colapsavel" data-aberto={aberto} inert={!aberto}>
+                            <div>
+                              <div className="space-y-3 px-4 pb-1 sm:px-5">
+                                {idealParaBeneficio[nome] && (
+                                  <div>
+                                    <p className="font-mono text-[10px] uppercase tracking-wide text-gold">
+                                      Ideal para
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-text-secondary">{idealParaBeneficio[nome]}</p>
+                                  </div>
+                                )}
+                                {itensInclusosBeneficio[nome]?.length > 0 && (
+                                  <div>
+                                    <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Inclui</p>
+                                    <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
+                                      {itensInclusosBeneficio[nome].map((item) => (
+                                        <li key={item}>• {item}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDetalheBeneficio(aberto ? null : nome)}
+                            aria-expanded={aberto}
+                            className="border-t border-white/5 px-4 py-2.5 text-left font-mono text-[10px] uppercase tracking-widest text-text-secondary transition-colors hover:text-gold sm:px-5"
+                          >
+                            {aberto ? "Mostrar menos ↑" : "Ver detalhes +"}
+                          </button>
+                        </>
                       )}
-                      {idealParaBeneficio[nome] && (
-                        <div className="mt-3">
-                          <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Ideal para</p>
-                          <p className="mt-0.5 text-xs text-text-secondary">{idealParaBeneficio[nome]}</p>
-                        </div>
-                      )}
-                      {itensInclusosBeneficio[nome]?.length > 0 && (
-                        <div className="mt-3">
-                          <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Inclui</p>
-                          <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
-                            {itensInclusosBeneficio[nome].map((item) => (
-                              <li key={item}>• {item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
+
+              <div className="mt-4 rounded-sm border border-white/10 bg-asphalt">
+                <button
+                  type="button"
+                  onClick={() => setBeneficiosPlanoAbertos((v) => !v)}
+                  aria-expanded={beneficiosPlanoAbertos}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                >
+                  <span className="font-heading text-xs font-bold uppercase tracking-[0.2em] text-gold">
+                    Seu {plano.nome}
+                  </span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-text-secondary">
+                    {beneficiosPlanoAbertos ? "Mostrar menos ↑" : "Ver benefícios +"}
+                  </span>
+                </button>
+                <div className="colapsavel" data-aberto={beneficiosPlanoAbertos} inert={!beneficiosPlanoAbertos}>
+                  <div>
+                    <ul className="space-y-1 px-4 pb-4 text-sm text-text-secondary">
+                      {plano.beneficios.map((b) => (
+                        <li key={b}>• {b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setEtapa("porte")}
+                onClick={() => setEtapa("veiculo")}
                 className="mt-6 rounded-sm border border-white/15 px-6 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
               >
                 Voltar
@@ -424,16 +485,50 @@ export default function BookingFlow() {
                           avulsosSelecionados.length > 1 ? "s" : ""
                         }`}
                     </span>{" "}
-                    · {formatarPreco(totalAvulso)}
+                    ·{" "}
+                    <span key={totalAvulso} className="valor-atualiza">
+                      {formatarPreco(totalAvulso)}
+                    </span>
                   </>
                 )}
                 {tipoAtendimento === "assinatura" && plano && (
                   <>
                     Plano: <span className="text-gold">{plano.nome}</span>
-                    {beneficioSelecionado && <> · {beneficioSelecionado}</>} · {porte.nome}
+                    {beneficioSelecionado && <> · {beneficioSelecionado}</>}
                   </>
                 )}
               </p>
+
+              {/* veículo já escolhido: sempre visível e alterável sem voltar etapas */}
+              <div className="mb-6 rounded-sm border border-white/10 bg-asphalt px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-text-secondary">
+                      Veículo
+                    </span>
+                    <span className="ml-2 font-heading font-bold">{porte.nome}</span>
+                    <span className="ml-1.5 font-mono text-xs uppercase text-text-secondary">· {porte.descricao}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTrocandoVeiculo((v) => !v)}
+                    aria-expanded={trocandoVeiculo}
+                    className="shrink-0 font-mono text-[11px] uppercase tracking-widest text-gold underline-offset-4 hover:underline"
+                  >
+                    {trocandoVeiculo ? "Fechar" : "Alterar"}
+                  </button>
+                </div>
+                <div className="colapsavel" data-aberto={trocandoVeiculo} inert={!trocandoVeiculo}>
+                  <div>
+                    <VehicleSizeSelector
+                      className="pt-4"
+                      semTitulo
+                      exigirEscolha
+                      onEscolher={() => setTrocandoVeiculo(false)}
+                    />
+                  </div>
+                </div>
+              </div>
 
               <DateTimePicker
                 datasRapidas={datasRapidas}
@@ -453,7 +548,7 @@ export default function BookingFlow() {
                       tipoAtendimento === "assinatura"
                         ? plano && servicosPorPlano[plano.id].length > 1
                           ? "beneficio"
-                          : "porte"
+                          : "veiculo"
                         : "tipo"
                     )
                   }
@@ -616,14 +711,12 @@ export default function BookingFlow() {
 
                 return (
                   <>
-                    <p className="font-heading text-xs font-bold tracking-[0.2em] text-gold">
-                      ✓ AGENDAMENTO CONFIRMADO
-                    </p>
-                    <h3 className="mt-1 font-heading text-2xl font-bold">Seu Pitstop está marcado.</h3>
-                    <p className="mt-2 text-sm text-text-secondary">Agora deixa o cuidado com a gente.</p>
+                    <h3 className="font-heading text-2xl font-bold">Seu Pitstop está marcado.</h3>
+                    <p className="mt-1 text-sm text-text-secondary">Agora deixa o cuidado com a gente.</p>
 
                     <div className="mt-6">
                       <PitPass
+                        checkinUrl={reserva.checkinUrl}
                         tipoAtendimento={tipoAtendimento ?? "avulso"}
                         planoNome={plano?.nome}
                         nome={nome}
@@ -661,12 +754,12 @@ export default function BookingFlow() {
                       </div>
                     )}
 
-                    <div className="mx-auto mt-6 flex max-w-sm flex-col gap-3">
+                    <div className="mx-auto mt-6 grid max-w-[22rem] grid-cols-2 gap-3">
                       <a
                         href={linkComoChegar}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+                        className="rounded-md bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110 active:scale-[0.985]"
                       >
                         Como chegar
                       </a>
@@ -674,22 +767,24 @@ export default function BookingFlow() {
                         href={linkWhatsapp(mensagemWhats)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-sm border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
+                        className="rounded-md border border-white/15 py-3 font-heading text-sm font-semibold tracking-wide text-text-primary transition hover:border-gold hover:text-gold active:scale-[0.985]"
                       >
-                        Falar com a Pitstop
+                        Falar com a PitStop
                       </a>
-                      <button
-                        onClick={novoAgendamento}
-                        className="rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
-                      >
-                        Fazer novo agendamento
-                      </button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={novoAgendamento}
+                      className="mt-5 font-mono text-[11px] uppercase tracking-widest text-text-secondary underline-offset-4 transition hover:text-gold hover:underline"
+                    >
+                      Fazer novo agendamento
+                    </button>
                   </>
                 );
               })()}
             </div>
           )}
+          </div>
         </div>
       </div>
     </section>

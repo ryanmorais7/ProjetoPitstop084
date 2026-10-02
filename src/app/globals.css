@@ -81,6 +81,183 @@ body {
   animation: preco-fade 0.25s ease-out;
 }
 
+/*
+ * Microinterações. Regra da casa: movimento só pra indicar ação, mudança de estado ou
+ * confirmação. Nada infinito, nada pulsando, tudo curto. Reduced-motion desliga tudo no fim do arquivo.
+ */
+
+/* Feedback de pressão em qualquer botão (base layer: utilitários continuam vencendo). */
+@layer base {
+  button {
+    transition: scale 150ms ease-out;
+  }
+  button:not(:disabled):active {
+    scale: 0.985;
+  }
+}
+
+@layer components {
+/* Valor que mudou (total do configurador, preço do plano): slide de poucos pixels + realce curto. */
+@keyframes valor-atualiza {
+  0% {
+    opacity: 0.35;
+    transform: translateY(-4px);
+    color: #fff;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.valor-atualiza {
+  display: inline-block;
+  animation: valor-atualiza 0.3s ease-out;
+}
+
+/* Troca de passo (assistente de plano, etapas do agendamento). */
+@keyframes passo-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.passo-entra {
+  animation: passo-entra 0.22s ease-out;
+}
+
+/* Check entrando ao selecionar um adicional. */
+@keyframes check-entra {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.check-entra {
+  animation: check-entra 0.18s ease-out;
+}
+
+/* Plano recomendado pelo assistente: um único realce de borda, sem repetir. */
+@keyframes destaque-plano {
+  0% {
+    box-shadow: 0 0 0 0 rgba(232, 171, 31, 0);
+  }
+  30% {
+    box-shadow: 0 0 0 4px rgba(232, 171, 31, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 1px rgba(232, 171, 31, 0.6);
+  }
+}
+
+.destaque-plano {
+  animation: destaque-plano 1.4s ease-out forwards;
+}
+
+/* Conteúdo expansível ("Ver detalhes", "Ver benefícios"): anima a altura real sem medir no JS. */
+.colapsavel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease-out;
+}
+
+.colapsavel[data-aberto="true"] {
+  grid-template-rows: 1fr;
+}
+
+.colapsavel > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* PitPass: cartão digital. Grafite com luz suave no topo, sem neon. */
+.pitpass-cartao {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 60% at 85% -10%, rgba(232, 171, 31, 0.1), transparent 60%),
+    radial-gradient(90% 50% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 70%),
+    linear-gradient(180deg, #1b1c20 0%, #121316 55%, #0d0e10 100%);
+  /* anel por box-shadow (não border) pra que o picote lateral consiga "recortar" a borda */
+  box-shadow:
+    inset 0 0 0 1px var(--pitpass-anel, rgba(255, 255, 255, 0.1)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 48px -24px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes pitpass-entra {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pitpass-entra {
+  animation: pitpass-entra 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Brilho que atravessa o cartão uma única vez quando ele aparece. */
+@keyframes pitpass-brilho {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(260%) skewX(-18deg);
+  }
+}
+
+.pitpass-brilho::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  animation: pitpass-brilho 1.1s ease-out 0.45s 1 forwards;
+}
+
+/* Recorte lateral de "ingresso" na linha que separa os dados do QR. */
+.pitpass-picote {
+  position: relative;
+  border-top: 1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.pitpass-picote::before,
+.pitpass-picote::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: var(--picote-fundo, var(--color-panel));
+  border: 1px solid var(--pitpass-anel, rgba(255, 255, 255, 0.1));
+}
+
+.pitpass-picote::before {
+  left: -10px;
+}
+
+.pitpass-picote::after {
+  right: -10px;
+}
+
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -89,5 +266,13 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  button:not(:disabled):active {
+    scale: none;
+  }
+
+  .pitpass-brilho::after {
+    display: none;
   }
 }

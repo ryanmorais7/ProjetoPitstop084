@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { scrollToId } from "@/lib/scroll";
@@ -19,6 +20,18 @@ export default function Header() {
   const { setTipoAtendimento } = useSelection();
   const pathname = usePathname();
   const naHome = pathname === "/";
+  const [rolou, setRolou] = useState(false);
+
+  useEffect(() => {
+    // header ganha fundo mais sólido e sombra leve depois que a página sai do topo
+    const verificar = () => setRolou(window.scrollY > 24);
+    const quadro = requestAnimationFrame(verificar); // página pode abrir já rolada (refresh, âncora)
+    window.addEventListener("scroll", verificar, { passive: true });
+    return () => {
+      cancelAnimationFrame(quadro);
+      window.removeEventListener("scroll", verificar);
+    };
+  }, []);
 
   function souAssinante() {
     setTipoAtendimento("assinatura");
@@ -37,7 +50,13 @@ export default function Header() {
   );
 
   return (
-    <header className="fixed top-0 z-40 w-full border-b border-white/5 bg-asphalt/85 backdrop-blur">
+    <header
+      className={`fixed top-0 z-40 w-full border-b backdrop-blur transition-[background-color,border-color,box-shadow] duration-300 ease-out ${
+        rolou
+          ? "border-white/10 bg-asphalt/95 shadow-[0_8px_24px_-16px_rgba(0,0,0,0.9)]"
+          : "border-white/5 bg-asphalt/80"
+      }`}
+    >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
         {naHome ? (
           <button type="button" onClick={() => scrollToId("hero")} className="transition hover:opacity-80">

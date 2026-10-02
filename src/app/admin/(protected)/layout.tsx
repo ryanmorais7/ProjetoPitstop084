@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import { exigirSessaoAdmin } from "@/lib/adminAuth";
 import { logout } from "../actions";
+import CarSparkMark from "@/components/CarSparkMark";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await exigirSessaoAdmin();
@@ -26,7 +27,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
               </Link>
             </nav>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link
+              href="/admin/pitpass"
+              className="flex items-center gap-1.5 rounded-md bg-gold px-3.5 py-2 font-heading text-xs font-bold uppercase tracking-wide text-asphalt transition hover:brightness-110"
+            >
+              <CarSparkMark className="h-3.5 w-4 text-asphalt" />
+              Ler PitPass
+            </Link>
             <form action="/admin/clientes" method="GET" className="flex items-center">
               <input
                 type="text"

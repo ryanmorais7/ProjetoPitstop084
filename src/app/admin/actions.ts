@@ -7,7 +7,9 @@ import { db } from "@/db/client";
 import { horariosBloqueados, StatusAgendamento } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { COOKIE_SESSAO, criarTokenSessao, exigirSessaoAdmin, senhaValida } from "@/lib/adminAuth";
-import { atualizarStatus } from "@/lib/bookings";
+import { atualizarStatus, registrarCheckin, iniciarAtendimento } from "@/lib/bookings";
+import { buscarAgendamentoPorCodigo, buscarAgendamentoPorToken } from "@/lib/checkin";
+import { interpretarLeituraPitPass } from "@/lib/pitpass";
 import { horariosAgendamento } from "@/lib/data";
 import { dataValidaParaAgendar } from "@/lib/agenda";
 
@@ -43,12 +45,57 @@ export async function logout() {
   redirect("/admin/login");
 }
 
+function revalidarAtendimento(id: number) {
+  revalidatePath("/admin/agendamentos");
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/clientes", "layout");
+  revalidatePath(`/admin/atendimentos/${id}`);
+}
+
 export async function atualizarStatusAgendamento(id: number, status: StatusAgendamento) {
   await exigirSessaoAdmin();
   await atualizarStatus(id, status);
-  revalidatePath("/admin/agendamentos");
-  revalidatePath("/admin/agenda");
-  revalidatePath("/admin/clientes");
+  revalidarAtendimento(id);
+}
+
+export async function fazerCheckin(id: number) {
+  await exigirSessaoAdmin();
+  await registrarCheckin(id);
+  revalidarAtendimento(id);
+}
+
+export async function iniciarAtendimentoAgendamento(id: number) {
+  await exigirSessaoAdmin();
+  await iniciarAtendimento(id);
+  revalidarAtendimento(id);
+}
+
+export type ResultadoLeituraPitPass = { ok: true; id: number } | { ok: false; erro: string };
+
+/**
+ * Resolve o conteúdo lido do QR (URL /checkin/<token>) ou o código digitado (P084-XXXX)
+ * para o id do agendamento. Só funciona com sessão admin.
+ */
+export async function localizarPitPass(texto: string): Promise<ResultadoLeituraPitPass> {
+  await exigirSessaoAdmin();
+  const referencia = interpretarLeituraPitPass(String(texto ?? ""));
+  if (!referencia) {
+    return { ok: false, erro: "Isso não parece um PitPass. Confira o código (ex.: P084-0044)." };
+  }
+  const registro =
+    referencia.tipo === "token"
+      ? await buscarAgendamentoPorToken(referencia.valor)
+      : await buscarAgendamentoPorCodigo(referencia.valor);
+  if (!registro) {
+    return {
+      ok: false,
+      erro:
+        referencia.tipo === "codigo"
+          ? `Nenhum agendamento com o código ${referencia.valor}.`
+          : "QR não reconhecido. Tente digitar o código P084.",
+    };
+  }
+  return { ok: true, id: registro.id };
 }
 
 export async function bloquearHorario(formData: FormData) {

@@ -87,8 +87,10 @@ export default function MobileStickyCta() {
             <span className="font-mono text-[11px] uppercase tracking-wide text-text-secondary">
               {avulsosSelecionados.length} cuidado{avulsosSelecionados.length > 1 ? "s" : ""}
             </span>
-            <span key={total} className="preco-fade font-mono text-sm font-bold text-gold">
-              {formatarPreco(total)}
+            <span className="font-mono text-sm font-bold text-gold">
+              <span key={total} className="valor-atualiza">
+                {formatarPreco(total)}
+              </span>
             </span>
           </button>
           <button

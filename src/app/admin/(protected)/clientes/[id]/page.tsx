@@ -15,6 +15,7 @@ import {
   alterarStatusAssinatura,
 } from "../../../clientes/actions";
 import { atualizarStatusAgendamento } from "../../../actions";
+import { etapaAtendimento, rotuloEtapa, formatarHoraFortaleza } from "@/lib/pitpass";
 
 const estiloStatusAgendamento: Record<string, string> = {
   confirmado: "text-gold",
@@ -268,9 +269,25 @@ export default async function FichaClientePage({ params }: { params: Promise<{ i
             <div key={h.id} className="rounded-sm border border-white/10 bg-panel p-4 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="font-mono text-sm">
-                  <span className="text-white">{h.codigo}</span> · <span className="text-gold">{formatarDataCurta(h.dia)}</span> · {h.horario}{" "}
-                  <span className={`text-xs uppercase ${estiloStatusAgendamento[h.status] ?? ""}`}>{h.status}</span>
+                  <Link href={`/admin/atendimentos/${h.id}`} className="text-white hover:text-gold">
+                    {h.codigo}
+                  </Link>{" "}
+                  · <span className="text-gold">{formatarDataCurta(h.dia)}</span> · {h.horario}{" "}
+                  <span className={`text-xs uppercase ${estiloStatusAgendamento[h.status] ?? ""}`}>
+                    {h.status === "confirmado" ? rotuloEtapa[etapaAtendimento(h)] : h.status}
+                  </span>
                 </p>
+                {(h.checkedInAt || h.startedAt || h.completedAt) && (
+                  <p className="font-mono text-[11px] uppercase tracking-wide text-text-secondary">
+                    {[
+                      h.checkedInAt && `Check-in ${formatarHoraFortaleza(h.checkedInAt)}`,
+                      h.startedAt && `Início ${formatarHoraFortaleza(h.startedAt)}`,
+                      h.completedAt && `Concluído ${formatarHoraFortaleza(h.completedAt)}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
                 <p className="text-sm text-text-primary">{h.servicoNome}</p>
                 {h.tipoAtendimento === "assinatura" ? (
                   <p className="font-mono text-[10px] font-semibold uppercase tracking-wide text-text-secondary">

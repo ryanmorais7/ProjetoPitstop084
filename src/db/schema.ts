@@ -120,12 +120,22 @@ export const agendamentos = pgTable(
     horario: text("horario").notNull(),
     /** "confirmado" | "concluido" | "cancelado" — só confirmado/concluido ocupam o horário. */
     status: text("status").notNull().default("confirmado"),
+    /**
+     * Token aleatório (não sequencial) que vai dentro do QR do PitPass, gerado server-side no insert.
+     * Nullable: agendamentos antigos recebem um token na primeira vez que o admin abre a ficha.
+     */
+    checkinToken: text("checkin_token"),
+    /** Etapas reais do atendimento, registradas pelo admin (o status continua "confirmado" até concluir). */
+    checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("agendamento_slot_ativo")
       .on(table.dia, table.horario)
       .where(sql`${table.status} <> 'cancelado'`),
+    uniqueIndex("agendamento_checkin_token").on(table.checkinToken),
   ]
 );
 

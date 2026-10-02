@@ -281,7 +281,7 @@ export default function NovoAtendimentoForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-xs text-text-secondary">
-            Ajustar valor (opcional{precoCalculado != null ? ` — calculado: ${formatarPreco(precoCalculado)}` : ""})
+            Ajustar valor (opcional{precoCalculado != null ? `, calculado: ${formatarPreco(precoCalculado)}` : ""})
           </span>
           <input
             name="valorAjustado"

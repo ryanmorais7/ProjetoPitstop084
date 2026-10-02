@@ -25,6 +25,8 @@ export default function MonteSeuPitstop() {
   );
   const total = precoDucha + totalAdicionais;
   const temAdicionais = avulsosSelecionados.length > 0;
+  // escolhas que ficam escondidas quando a lista recolhe: o botão avisa pra não parecerem perdidas
+  const outrosSelecionados = avulsosSelecionados.filter((s) => !s.destaque).length;
 
   function agendar() {
     setTipoAtendimento("avulso");
@@ -32,7 +34,7 @@ export default function MonteSeuPitstop() {
   }
 
   return (
-    <div className="rounded-sm border border-white/10 bg-panel p-6">
+    <div className="rounded-sm border border-white/10 bg-panel p-5 sm:p-6">
       <h3 className="font-heading text-lg font-bold">Monte seu Pitstop</h3>
       <p className="mt-1 text-sm text-text-secondary">
         Comece pela Ducha e adicione os cuidados que seu carro precisa hoje.
@@ -41,7 +43,7 @@ export default function MonteSeuPitstop() {
       <VehicleSizeSelector className="mt-6" />
 
       <div className="mt-6 flex items-center justify-between gap-3 rounded-sm border border-gold/40 bg-gold/10 px-4 py-3">
-        <span className="font-heading text-sm font-bold text-gold">✓ Ducha Pitstop — já incluso</span>
+        <span className="font-heading text-sm font-bold text-gold">✓ Ducha Pitstop incluída</span>
         <span key={porteVeiculo} className="preco-fade font-mono text-sm font-bold text-gold">
           {formatarPreco(precoDucha)}
         </span>
@@ -63,16 +65,9 @@ export default function MonteSeuPitstop() {
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setVerMais((atual) => !atual)}
-          className="mt-4 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline"
-        >
-          {verMais ? "Mostrar menos ↑" : "Ver mais cuidados +"}
-        </button>
-
-        {verMais && (
-          <div className="mt-6 space-y-6">
+        <div className="colapsavel" data-aberto={verMais} inert={!verMais}>
+          <div>
+          <div className="space-y-6 pt-6">
             {categoriasOutros.map((categoria) => {
               const itens = outros.filter((s) => s.categoria === categoria);
               if (itens.length === 0) return null;
@@ -96,7 +91,19 @@ export default function MonteSeuPitstop() {
               );
             })}
           </div>
-        )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setVerMais((atual) => !atual)}
+          aria-expanded={verMais}
+          className="mt-4 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline"
+        >
+          {verMais
+            ? "Mostrar menos ↑"
+            : `Ver mais cuidados +${outrosSelecionados > 0 ? ` (${outrosSelecionados} escolhido${outrosSelecionados > 1 ? "s" : ""})` : ""}`}
+        </button>
       </div>
 
       <div className="mt-8 rounded-sm border border-gold/50 bg-asphalt p-5">
@@ -110,7 +117,7 @@ export default function MonteSeuPitstop() {
           {avulsosSelecionados.map((s) => {
             const preco = precoServico(s, porteVeiculo);
             return (
-              <div key={s.id} className="flex justify-between">
+              <div key={s.id} className="passo-entra flex justify-between gap-3">
                 <span className="text-text-secondary">+ {s.nome}</span>
                 <span className="text-white">
                   {preco != null ? formatarPreco(preco) : "Mediante avaliação"}
@@ -122,13 +129,15 @@ export default function MonteSeuPitstop() {
 
         <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
           <span className="font-heading text-sm font-bold uppercase tracking-wide">Total</span>
-          <span key={total} className="preco-fade font-mono text-2xl font-bold text-gold">
-            {formatarPreco(total)}
+          <span aria-live="polite" className="font-mono text-2xl font-bold text-gold">
+            <span key={total} className="valor-atualiza">
+              {formatarPreco(total)}
+            </span>
           </span>
         </div>
         {adicionaisAvaliacao.length > 0 && (
           <p className="mt-2 text-xs text-text-secondary">
-            Os itens mediante avaliação não entram no total — nossa equipe define o valor com você.
+            Os itens mediante avaliação não entram no total. Nossa equipe define o valor com você.
           </p>
         )}
 

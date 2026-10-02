@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { agendamentos, clientes, veiculos, beneficioUsos, assinaturas, StatusAgendamento } from "@/db/schema";
 import { dataValidaParaAgendar, horarioValidoParaAgendar, hojeIso } from "./agenda";
 import { VehicleSize, regrasBeneficios, PlanoId } from "./data";
+import { gerarTokenCheckin } from "./checkin";
 
 export function normalizarTelefone(telefone: string): string {
   return telefone.replace(/\D/g, "");
@@ -199,7 +200,7 @@ export interface DadosNovoAgendamento {
 }
 
 export type ResultadoCriarAgendamento =
-  | { ok: true; id: number; codigo: string; clienteId: number; clienteCodigo: string }
+  | { ok: true; id: number; codigo: string; checkinToken: string; clienteId: number; clienteCodigo: string }
   | { ok: false; erro: string; status: number };
 
 export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<ResultadoCriarAgendamento> {
@@ -218,6 +219,7 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
     porte: dados.porteVeiculo,
   });
 
+  const checkinToken = gerarTokenCheckin();
   let registro;
   try {
     [registro] = await db
@@ -244,6 +246,7 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
         origem: dados.origem,
         dia: dados.dia,
         horario: dados.horario,
+        checkinToken,
       })
       .returning({ id: agendamentos.id });
   } catch (e) {
@@ -270,11 +273,45 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
     }
   }
 
-  return { ok: true, id: registro.id, codigo, clienteId: cliente.id, clienteCodigo: cliente.codigo ?? "" };
+  return {
+    ok: true,
+    id: registro.id,
+    codigo,
+    checkinToken,
+    clienteId: cliente.id,
+    clienteCodigo: cliente.codigo ?? "",
+  };
+}
+
+/** Check-in na chegada: grava o horário real uma única vez, só pra agendamentos ainda abertos. */
+export async function registrarCheckin(id: number) {
+  await db
+    .update(agendamentos)
+    .set({ checkedInAt: sql`coalesce(${agendamentos.checkedInAt}, now())` })
+    .where(and(eq(agendamentos.id, id), eq(agendamentos.status, "confirmado")));
+}
+
+/** Início do atendimento. Se o check-in foi pulado, registra os dois no mesmo instante. */
+export async function iniciarAtendimento(id: number) {
+  await db
+    .update(agendamentos)
+    .set({
+      checkedInAt: sql`coalesce(${agendamentos.checkedInAt}, now())`,
+      startedAt: sql`coalesce(${agendamentos.startedAt}, now())`,
+    })
+    .where(and(eq(agendamentos.id, id), eq(agendamentos.status, "confirmado")));
 }
 
 export async function atualizarStatus(id: number, status: StatusAgendamento) {
-  await db.update(agendamentos).set({ status }).where(eq(agendamentos.id, id));
+  // Concluir também grava o horário real de conclusão (só na primeira vez).
+  await db
+    .update(agendamentos)
+    .set(
+      status === "concluido"
+        ? { status, completedAt: sql`coalesce(${agendamentos.completedAt}, now())` }
+        : { status }
+    )
+    .where(eq(agendamentos.id, id));
 
   const usos = await db.select().from(beneficioUsos).where(eq(beneficioUsos.agendamentoId, id));
   if (usos.length > 0) {
