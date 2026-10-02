@@ -18,6 +18,7 @@ import {
 import { atualizarStatusAgendamento, fazerCheckin, iniciarAtendimentoAgendamento } from "../../../actions";
 import CarSparkMark from "@/components/CarSparkMark";
 import QrCode from "@/components/QrCode";
+import { pitpassTheme, temaDoPlano } from "@/lib/pitpassTheme";
 
 interface AdicionalJson {
   nome: string;
@@ -105,12 +106,13 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
       )}
 
       {/* Identificação */}
-      <div className={`pitpass-cartao mt-3 rounded-xl border p-5 ${ehAssinatura ? "border-gold/60" : "border-white/10"}`}>
+      <div className={`pitpass-cartao ${pitpassTheme[temaDoPlano(ehAssinatura ? planoId : null)].classe} mt-3 rounded-xl p-5`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <CarSparkMark className="h-5 w-5 text-white" />
             <span className="font-heading text-xs font-bold tracking-[0.18em]">
-              PITPASS{ehAssinatura && nomePlano ? ` • ${nomePlano.toUpperCase()}` : ""}
+              PITPASS
+              {ehAssinatura && nomePlano && <span className="pitpass-acento"> • {nomePlano.toUpperCase()}</span>}
             </span>
           </div>
           <span className="font-mono text-sm font-semibold text-white">{registro.codigo}</span>

@@ -6,6 +6,7 @@ import { formatarPreco } from "@/lib/format";
 import { formatarDataCurta } from "@/lib/agenda";
 import { planos, PlanoId, listaPlanos, linkWhatsapp } from "@/lib/data";
 import CarSparkMark from "@/components/CarSparkMark";
+import { pitpassTheme, temaDoPlano } from "@/lib/pitpassTheme";
 import ClienteBadge from "@/components/admin/ClienteBadge";
 import {
   editarCliente,
@@ -59,15 +60,19 @@ export default async function FichaClientePage({ params }: { params: Promise<{ i
 
       {/* Cartão visual */}
       <div
-        className={`mt-6 max-w-sm rounded-sm border p-5 ${
-          nomePlano ? "border-gold bg-gradient-to-br from-panel to-asphalt" : "border-white/10 bg-panel"
-        }`}
+        className={`pitpass-cartao ${pitpassTheme[temaDoPlano(assinaturaAtiva?.plano)].classe} mt-6 max-w-sm rounded-xl p-5`}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CarSparkMark className="h-5 w-5 text-white" />
             <span className="font-heading text-xs font-bold tracking-[0.15em]">
-              {nomePlano ? `PITPASS • ${nomePlano.toUpperCase()}` : "PITSTOP084"}
+              {nomePlano ? (
+                <>
+                  PITPASS <span className="pitpass-acento">• {nomePlano.toUpperCase()}</span>
+                </>
+              ) : (
+                "PITSTOP084"
+              )}
             </span>
           </div>
           <span className="font-mono text-[10px] text-text-secondary">P084</span>
@@ -78,7 +83,7 @@ export default async function FichaClientePage({ params }: { params: Promise<{ i
         </p>
         <div className="mt-3 flex items-center justify-between font-mono text-xs">
           <span className="text-text-secondary">{cliente.codigo}</span>
-          <span className={nomePlano ? "text-gold" : "text-text-secondary"}>
+          <span className={nomePlano ? "pitpass-acento" : "text-text-secondary"}>
             {nomePlano ? assinaturaAtiva?.status.toUpperCase() : `${visitasConcluidas} visitas`}
           </span>
         </div>

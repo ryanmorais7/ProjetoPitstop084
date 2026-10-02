@@ -180,12 +180,47 @@ body {
   overflow: hidden;
 }
 
-/* PitPass: cartão digital. Grafite com luz suave no topo, sem neon. */
+/*
+ * Temas do PitPass (escolhidos em src/lib/pitpassTheme.ts). Fundo SEMPRE grafite;
+ * o tema muda só os acentos. Amarelo = PitStop084/Black/Gold. Azul frio = só Diamante.
+ */
+.pitpass-tema-avulso,
+.pitpass-tema-black {
+  --pp-accent: var(--color-gold);
+  --pp-label: var(--color-text-secondary);
+  --pp-divisor: rgba(255, 255, 255, 0.14);
+  --pp-filete: linear-gradient(90deg, var(--color-gold), rgba(232, 171, 31, 0.4), transparent);
+  --pp-luz: rgba(232, 171, 31, 0.1);
+  --pp-qr-moldura: transparent;
+}
+
+.pitpass-tema-gold {
+  --pp-accent: var(--color-gold);
+  --pp-label: var(--color-text-secondary);
+  --pp-divisor: rgba(232, 171, 31, 0.22);
+  --pp-filete: linear-gradient(90deg, var(--color-gold), rgba(232, 171, 31, 0.7), rgba(232, 171, 31, 0.1));
+  --pp-luz: rgba(232, 171, 31, 0.13);
+  --pp-qr-moldura: rgba(232, 171, 31, 0.45);
+  --pitpass-anel: rgba(232, 171, 31, 0.55);
+}
+
+/* Diamante: azul gelo/safira suave + prata. Nada de neon: saturação baixa, só nos acentos. */
+.pitpass-tema-diamante {
+  --pp-accent: #a9c9e2;
+  --pp-label: #8ea7bb;
+  --pp-divisor: rgba(169, 201, 226, 0.22);
+  --pp-filete: linear-gradient(90deg, #6f93b0, #c7d6e2 45%, #8fb3cf 70%, rgba(143, 179, 207, 0.1));
+  --pp-luz: rgba(150, 190, 222, 0.12);
+  --pp-qr-moldura: rgba(169, 201, 226, 0.55);
+  --pitpass-anel: rgba(143, 179, 207, 0.28);
+}
+
+/* PitPass: cartão digital. Grafite com luz suave no topo (cor da luz vem do tema), sem neon. */
 .pitpass-cartao {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(120% 60% at 85% -10%, rgba(232, 171, 31, 0.1), transparent 60%),
+    radial-gradient(120% 60% at 85% -10%, var(--pp-luz, rgba(232, 171, 31, 0.1)), transparent 60%),
     radial-gradient(90% 50% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 70%),
     linear-gradient(180deg, #1b1c20 0%, #121316 55%, #0d0e10 100%);
   /* anel por box-shadow (não border) pra que o picote lateral consiga "recortar" a borda */
@@ -231,10 +266,103 @@ body {
   animation: pitpass-brilho 1.1s ease-out 0.45s 1 forwards;
 }
 
+/* Diamante: reflexo frio diagonal quase imperceptível (acabamento de vidro/metal, sem decoração). */
+.pitpass-cartao.pitpass-tema-diamante {
+  background:
+    linear-gradient(125deg, transparent 38%, rgba(190, 215, 235, 0.045) 50%, transparent 62%),
+    radial-gradient(110% 55% at 90% -10%, var(--pp-luz), transparent 60%),
+    radial-gradient(90% 50% at 0% 0%, rgba(220, 232, 242, 0.05), transparent 70%),
+    linear-gradient(180deg, #1a1c20 0%, #111317 55%, #0c0d10 100%);
+}
+
+/* Borda metálica fria do Diamante: grafite → azul frio → prata → azul frio, 1px, estática. */
+.pitpass-cartao.pitpass-tema-diamante::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    #2c3138 0%,
+    #7fa6c4 28%,
+    #d9e2ea 50%,
+    #7fa6c4 72%,
+    #2a2e34 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.75;
+}
+
+/* Reflexo do Diamante na entrada: mais curto (700ms) e levemente frio. Uma vez só. */
+.pitpass-cartao.pitpass-tema-diamante.pitpass-brilho::after {
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(205, 225, 242, 0.11), transparent);
+  animation: pitpass-brilho 0.7s ease-out 0.4s 1 forwards;
+}
+
+/* "Meu PitPass": folha que sobe no mobile, modal que assenta no desktop. Curto, uma vez. */
+@keyframes folha-entra {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.folha-entra {
+  animation: folha-entra 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.pitpass-filete {
+  height: 3px;
+  background: var(--pp-filete);
+}
+
+.pitpass-acento {
+  color: var(--pp-accent);
+}
+
+.pitpass-label {
+  color: var(--pp-label);
+}
+
+.pitpass-ponto {
+  background: var(--pp-accent);
+}
+
+/* Moldura do QR: o QR fica preto no branco (leitura), o tema só contorna. */
+.pitpass-qr {
+  box-shadow:
+    0 0 0 3px #101114,
+    0 0 0 4px var(--pp-qr-moldura, transparent),
+    0 8px 24px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* Selos do admin: mesma identidade, sem pintar o admin. */
+.pitpass-badge-gold {
+  background: var(--color-gold);
+  color: var(--color-asphalt);
+}
+
+.pitpass-badge-diamante {
+  color: #dbe7f1;
+  background: linear-gradient(135deg, rgba(127, 166, 196, 0.28), rgba(217, 226, 234, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(169, 201, 226, 0.6);
+}
+
 /* Recorte lateral de "ingresso" na linha que separa os dados do QR. */
 .pitpass-picote {
   position: relative;
-  border-top: 1px dashed rgba(255, 255, 255, 0.14);
+  border-top: 1px dashed var(--pp-divisor, rgba(255, 255, 255, 0.14));
 }
 
 .pitpass-picote::before,

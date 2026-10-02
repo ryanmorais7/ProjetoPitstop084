@@ -8,6 +8,8 @@ import { useSelection } from "@/context/SelectionContext";
 import BrandLogo from "./BrandLogo";
 import BrandLogoCompact from "./BrandLogoCompact";
 import BrandMark from "./BrandMark";
+import CarSparkMark from "./CarSparkMark";
+import { abrirMeuPitPass } from "./MeuPitPass";
 
 const links = [
   { id: "sobre", label: "Sobre" },
@@ -67,7 +69,7 @@ export default function Header() {
             {logo}
           </Link>
         )}
-        <nav className="hidden gap-8 text-sm text-text-secondary md:flex">
+        <nav className="hidden items-center gap-6 text-sm text-text-secondary md:flex lg:gap-8">
           {links.map((link) => (
             <button
               key={link.id}
@@ -78,8 +80,26 @@ export default function Header() {
               {link.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={abrirMeuPitPass}
+            className="flex items-center gap-1.5 text-text-primary transition hover:text-gold"
+          >
+            <CarSparkMark className="h-3.5 w-4" />
+            Meu PitPass
+          </button>
         </nav>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* mobile: acesso compacto, sem apertar o header */}
+          <button
+            type="button"
+            onClick={abrirMeuPitPass}
+            aria-label="Meu PitPass"
+            className="flex items-center gap-1.5 rounded-sm border border-white/15 px-2.5 py-2 font-mono text-[10px] font-semibold uppercase tracking-wide text-text-primary transition-colors hover:border-gold hover:text-gold md:hidden"
+          >
+            <CarSparkMark className="h-3.5 w-4" />
+            <span className="hidden min-[400px]:inline">PitPass</span>
+          </button>
           <button
             type="button"
             onClick={souAssinante}

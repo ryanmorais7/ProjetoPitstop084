@@ -3,15 +3,9 @@ import { enderecoPitstop, fotoFachada, linkComoChegar, linkMapaEmbed } from "@/l
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
 
-/** Só em `next dev`: mostra onde a foto da fachada vai entrar. Em produção, sem foto, nada aparece. */
-const mostrarEspacoReservado = process.env.NODE_ENV !== "production";
-
 export default function EnderecoSection() {
-  const temFoto = Boolean(fotoFachada);
-  const temColunaFoto = temFoto || mostrarEspacoReservado;
-
   const info = (
-    <Reveal>
+    <div>
       <div className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-text-secondary">
         <Bolt className="h-3.5 w-3.5 text-gold" />
         Localização
@@ -29,68 +23,66 @@ export default function EnderecoSection() {
       >
         Como chegar
       </a>
-    </Reveal>
+    </div>
   );
 
   const mapa = (
-    <Reveal delayMs={60}>
-      <div className="aspect-video w-full overflow-hidden rounded-sm border border-white/10">
-        <iframe
-          src={linkMapaEmbed}
-          title={`Mapa até a ${enderecoPitstop.nome}`}
-          className="h-full w-full grayscale-[35%]"
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
-      </div>
-    </Reveal>
+    <div className="aspect-video w-full overflow-hidden rounded-sm border border-white/10">
+      <iframe
+        src={linkMapaEmbed}
+        title={`Mapa até a ${enderecoPitstop.nome}`}
+        className="h-full w-full grayscale-[35%]"
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+      />
+    </div>
   );
 
-  if (!temColunaFoto) {
+  // Sem foto configurada: endereço + mapa, como sempre foi. Nada de placeholder.
+  if (!fotoFachada) {
     return (
       <section className="px-6 py-16 md:py-20">
         <div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-2 md:items-center">
-          {info}
-          {mapa}
+          <Reveal>{info}</Reveal>
+          <Reveal delayMs={60}>{mapa}</Reveal>
         </div>
       </section>
     );
   }
 
-  // Com foto: mobile = foto, informações, mapa; desktop = foto à esquerda, informações + mapa à direita.
+  // Com foto: mobile = informações, fachada, mapa.
+  // Desktop = informações e mapa à esquerda, fachada (foto vertical) ocupando a coluna direita.
   return (
     <section className="px-6 py-16 md:py-20">
-      <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-2 md:gap-10">
-        <Reveal className="md:row-span-2">
-          <figure className="h-full">
-            {fotoFachada ? (
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-sm border border-white/10 md:aspect-auto md:h-full md:min-h-[26rem]">
-                <Image
-                  src={fotoFachada.src}
-                  alt={fotoFachada.alt}
-                  fill
-                  sizes="(min-width: 768px) 50vw, 100vw"
-                  className="object-cover"
-                />
-              </div>
-            ) : (
-              <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-white/15 bg-panel/60 px-6 text-center md:aspect-auto md:h-full md:min-h-[26rem]">
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-secondary">
-                  Espaço reservado · só em desenvolvimento
-                </span>
-                <span className="text-xs text-text-secondary/70">
-                  Defina fotoFachada em src/lib/data.ts com a foto real da fachada.
-                </span>
-              </div>
-            )}
-            <figcaption className="mt-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-text-secondary">
-              <Bolt className="h-3 w-3 text-gold" />
-              Reconheça a PitStop na chegada
+      <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-2 md:grid-rows-[auto_1fr] md:gap-x-10 md:gap-y-8">
+        <Reveal className="md:col-start-1 md:row-start-1">{info}</Reveal>
+
+        <Reveal delayMs={60} className="md:col-start-2 md:row-span-2 md:row-start-1">
+          <figure className="group relative h-full overflow-hidden rounded-sm border border-white/10 bg-panel">
+            <div className="relative aspect-square w-full sm:aspect-[4/3] md:aspect-auto md:h-full md:min-h-[30rem]">
+              <Image
+                src={fotoFachada.src}
+                alt={fotoFachada.alt}
+                fill
+                sizes="(min-width: 768px) 480px, 100vw"
+                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
+                style={{ objectPosition: fotoFachada.foco }}
+              />
+            </div>
+            {/* legenda sobre um degradê escuro: ajuda a reconhecer a loja sem competir com a foto */}
+            <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-5 pb-4 pt-12">
+              <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-gold">
+                <Bolt className="h-3 w-3" />
+                Reconheça a PitStop
+              </p>
+              <p className="mt-1 font-heading text-lg font-bold text-white">É aqui que seu Pitstop começa.</p>
             </figcaption>
           </figure>
         </Reveal>
-        {info}
-        {mapa}
+
+        <Reveal delayMs={100} className="md:col-start-1 md:row-start-2 md:self-end">
+          {mapa}
+        </Reveal>
       </div>
     </section>
   );

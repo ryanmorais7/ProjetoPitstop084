@@ -28,6 +28,7 @@ import DateTimePicker from "./DateTimePicker";
 import PitPass from "./PitPass";
 import Bolt from "./Bolt";
 import { VehicleSizeSelector } from "./VehicleSizeSelector";
+import { abrirMeuPitPass, lembrarBuscaPitPass } from "./MeuPitPass";
 
 type Etapa = "tipo" | "plano" | "veiculo" | "beneficio" | "horario" | "ficha" | "confirmacao";
 
@@ -73,6 +74,7 @@ export default function BookingFlow() {
   const [trocandoVeiculo, setTrocandoVeiculo] = useState(false);
   const [beneficiosPlanoAbertos, setBeneficiosPlanoAbertos] = useState(false);
   const [detalheBeneficio, setDetalheBeneficio] = useState<string | null>(null);
+  const [avisoVeiculo, setAvisoVeiculo] = useState(false);
   const [etapa, setEtapa] = useState<Etapa>(() =>
     etapaInicial(tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario)
   );
@@ -141,6 +143,11 @@ export default function BookingFlow() {
   );
 
   function escolherTipo(tipo: TipoAtendimento) {
+    if (!porteDefinidoPeloUsuario) {
+      // sem porte não dá pra calcular preço nem reservar: pede a escolha ali mesmo
+      setAvisoVeiculo(true);
+      return;
+    }
     setTipoAtendimento(tipo);
     setEtapa(etapaInicial(tipo, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario));
   }
@@ -205,6 +212,7 @@ export default function BookingFlow() {
       }
       const dados: { id: number; codigo: string; checkinUrl?: string } = await resposta.json();
       setReserva(dados);
+      lembrarBuscaPitPass({ telefone, placa });
       setEtapa("confirmacao");
     } catch {
       setErro("Não foi possível confirmar o agendamento agora. Tente novamente.");
@@ -274,8 +282,23 @@ export default function BookingFlow() {
           <div key={etapa} className="passo-entra">
           {etapa === "tipo" && (
             <div>
-              <h3 className="font-heading text-xl font-bold">Como você quer agendar?</h3>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {/* veículo primeiro: quem desceu a página pode ter esquecido o que escolheu lá em cima */}
+              <div
+                className={`rounded-sm border p-4 transition-colors duration-200 sm:p-5 ${
+                  avisoVeiculo && !porteDefinidoPeloUsuario ? "border-gold/70 bg-gold/[0.04]" : "border-white/10"
+                }`}
+              >
+                <h3 className="font-heading text-lg font-bold">Qual é o seu tipo de veículo?</h3>
+                <VehicleSizeSelector className="mt-4" semTitulo exigirEscolha onEscolher={() => setAvisoVeiculo(false)} />
+                {avisoVeiculo && !porteDefinidoPeloUsuario && (
+                  <p role="alert" className="passo-entra mt-3 text-sm text-gold">
+                    Escolha o tipo de veículo para continuar.
+                  </p>
+                )}
+              </div>
+
+              <h3 className="mt-7 font-heading text-xl font-bold">Como você quer agendar?</h3>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => escolherTipo("avulso")}
@@ -718,7 +741,7 @@ export default function BookingFlow() {
                       <PitPass
                         checkinUrl={reserva.checkinUrl}
                         tipoAtendimento={tipoAtendimento ?? "avulso"}
-                        planoNome={plano?.nome}
+                        planoId={plano?.id}
                         nome={nome}
                         carro={carro}
                         porteNome={porte.nome}
@@ -786,6 +809,22 @@ export default function BookingFlow() {
           )}
           </div>
         </div>
+
+        {etapa !== "confirmacao" && (
+          <div className="mt-5 flex flex-col gap-3 rounded-sm border border-black/10 bg-light-panel/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-heading text-sm font-bold text-light-text">Já tem um agendamento?</p>
+              <p className="text-sm text-light-text-secondary">Reencontre seu PitPass e o QR de chegada.</p>
+            </div>
+            <button
+              type="button"
+              onClick={abrirMeuPitPass}
+              className="shrink-0 rounded-md border border-light-text px-5 py-2.5 font-heading text-sm font-semibold tracking-wide text-light-text transition-colors duration-200 hover:bg-light-text hover:text-light"
+            >
+              Encontrar meu PitPass
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

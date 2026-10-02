@@ -256,11 +256,15 @@ export const enderecoPitstop = {
 };
 
 /**
- * Foto REAL da fachada, pra ajudar o cliente a reconhecer a loja ao chegar. Enquanto for null,
- * a seção de localização segue sem foto em produção (em desenvolvimento aparece um espaço reservado).
- * Pra ativar: coloque o arquivo em /public (ex.: /fachada-pitstop084.jpg) e preencha abaixo.
+ * Foto REAL da fachada, pra ajudar o cliente a reconhecer a loja ao chegar. Se virar null,
+ * a seção de localização volta a mostrar só endereço + mapa, sem buraco nem placeholder.
+ * `foco` = object-position, pra manter a placa visível no recorte.
  */
-export const fotoFachada: { src: string; alt: string } | null = null;
+export const fotoFachada: { src: string; alt: string; foco: string } | null = {
+  src: "/fachada-pitstop084.jpg",
+  alt: "Fachada da PitStop084 Premium Car Studio, com a placa preta e o portão aberto para o box de lavagem",
+  foco: "50% 40%",
+};
 
 const enderecoCompleto =`${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}, ${enderecoPitstop.linha3}`;
 

@@ -1,11 +1,18 @@
 import type { CSSProperties } from "react";
 import { formatarDataCurta } from "@/lib/agenda";
+import { planos, PlanoId } from "@/lib/data";
+import { pitpassTheme, temaDoPlano } from "@/lib/pitpassTheme";
 import BrandLogo from "./BrandLogo";
 import QrCode from "./QrCode";
 
+/**
+ * O PitPass. Um único componente pra confirmação do agendamento e pro "Meu PitPass"
+ * (o cliente reencontra exatamente o mesmo cartão). A cor dos acentos vem do plano:
+ * amarelo PitStop pra Ducha/Black/Gold, azul frio só pro Diamante.
+ */
 export default function PitPass({
   tipoAtendimento,
-  planoNome,
+  planoId,
   nome,
   carro,
   porteNome,
@@ -15,10 +22,12 @@ export default function PitPass({
   beneficio,
   codigo,
   checkinUrl,
+  status = "Confirmado",
+  fundoPicote,
 }: {
   tipoAtendimento: "avulso" | "assinatura";
-  /** Nome do plano (ex.: "Diamante"), só quando for assinante. */
-  planoNome?: string | null;
+  /** Plano do assinante; define o tema do cartão. Ignorado em Ducha avulsa. */
+  planoId?: PlanoId | null;
   nome: string;
   carro: string;
   porteNome: string;
@@ -31,37 +40,36 @@ export default function PitPass({
   codigo: string;
   /** URL pública do QR (/checkin/<token>). Sem ela, o código P084 fica como identificação. */
   checkinUrl?: string | null;
+  status?: string;
+  /** Cor de fundo atrás do cartão, pra o recorte lateral do picote "vazar" certo. */
+  fundoPicote?: string;
 }) {
-  const ehAssinante = tipoAtendimento === "assinatura" && Boolean(planoNome);
-  const estiloCartao = (
-    ehAssinante ? { "--pitpass-anel": "rgba(232, 171, 31, 0.55)" } : undefined
-  ) as CSSProperties | undefined;
+  const plano = tipoAtendimento === "assinatura" && planoId ? planos[planoId] : null;
+  const tema = pitpassTheme[temaDoPlano(plano?.id)];
+  const estilo = (fundoPicote ? { "--picote-fundo": fundoPicote } : undefined) as CSSProperties | undefined;
 
   return (
-    <div className="pitpass-entra mx-auto w-full max-w-[22rem]">
-      <div className="pitpass-cartao pitpass-brilho rounded-2xl text-left" style={estiloCartao}>
-        {/* filete de marca */}
-        <div
-          className={`h-[3px] bg-gradient-to-r ${
-            ehAssinante ? "from-gold via-gold/70 to-gold/10" : "from-gold via-gold/40 to-transparent"
-          }`}
-        />
+    <div className="pitpass-entra mx-auto w-full max-w-[22rem]" style={estilo}>
+      <div className={`pitpass-cartao pitpass-brilho ${tema.classe} rounded-2xl text-left`}>
+        <div className="pitpass-filete" />
 
         <div className="px-6 pt-5">
-          {/* Identidade */}
+          {/* Identidade + código */}
           <div className="flex items-start justify-between gap-3">
             <BrandLogo className="text-[13px]" />
-            <span className="pt-0.5 font-mono text-xs font-semibold tracking-[0.08em] text-white/80">{codigo}</span>
+            <span className="rounded-md bg-white/[0.06] px-2 py-1 font-mono text-[13px] font-semibold tracking-[0.06em] text-white">
+              {codigo}
+            </span>
           </div>
 
           <div className="mt-7">
             <p className="font-heading text-[1.75rem] font-bold leading-none tracking-[0.2em] text-white">
               PITPASS
-              {ehAssinante && <span className="text-gold"> • {planoNome!.toUpperCase()}</span>}
+              {plano && <span className="pitpass-acento"> • {plano.nome.toUpperCase()}</span>}
             </p>
-            <p className="mt-2 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-gold">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold" aria-hidden="true" />
-              Agendamento confirmado
+            <p className="pitpass-acento mt-2 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em]">
+              <span className="pitpass-ponto h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+              Agendamento {status.toLowerCase()}
             </p>
           </div>
 
@@ -73,17 +81,19 @@ export default function PitPass({
             </p>
           </div>
 
-          {/* Quando */}
+          {/* Quando: horário é o maior elemento depois de PITPASS */}
           <div className="mt-6 flex items-end justify-between gap-4">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-secondary">Data</p>
+              <p className="pitpass-label font-mono text-[10px] uppercase tracking-[0.2em]">Data</p>
               <p className="mt-1 font-heading text-lg font-bold tracking-wide text-white">
                 {formatarDataCurta(dataIso)}
               </p>
             </div>
             <div className="text-right">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-secondary">Horário</p>
-              <p className="mt-0.5 font-mono text-3xl font-semibold leading-none text-white">{horario}</p>
+              <p className="pitpass-label font-mono text-[10px] uppercase tracking-[0.2em]">Horário</p>
+              <p className="mt-0.5 font-mono text-[2.5rem] font-semibold leading-none tracking-tight text-white">
+                {horario}
+              </p>
             </div>
           </div>
 
@@ -91,12 +101,12 @@ export default function PitPass({
           <div className="mt-6">
             {beneficio ? (
               <>
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">Benefício do plano</p>
+                <p className="pitpass-acento font-mono text-[10px] uppercase tracking-[0.2em]">Benefício do plano</p>
                 <p className="mt-1 font-heading text-base font-bold tracking-wide text-white">{beneficio}</p>
               </>
             ) : (
               <>
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-secondary">Serviço</p>
+                <p className="pitpass-label font-mono text-[10px] uppercase tracking-[0.2em]">Serviço</p>
                 {servicos.map((servico, i) => (
                   <p
                     key={servico}
@@ -119,25 +129,25 @@ export default function PitPass({
         <div className="flex flex-col items-center px-6 pb-6 pt-7">
           {checkinUrl && (
             <div
-              className="rounded-xl bg-white p-2.5 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.9)]"
+              className="pitpass-qr rounded-xl bg-white p-2.5"
               style={{ animation: "passo-entra 0.35s ease-out 0.25s both" }}
             >
               <QrCode conteudo={checkinUrl} className="block h-40 w-40" titulo={`QR Code do PitPass ${codigo}`} />
             </div>
           )}
           <p
-            className={`font-mono text-lg font-semibold tracking-[0.14em] text-white ${checkinUrl ? "mt-4" : ""}`}
+            className={`font-mono text-xl font-semibold tracking-[0.14em] text-white ${checkinUrl ? "mt-5" : ""}`}
           >
             {codigo}
           </p>
           <p className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-text-secondary">
-            Status <span aria-hidden="true">•</span> <span className="text-gold">Confirmado</span>
+            Status <span aria-hidden="true">•</span> <span className="pitpass-acento">{status}</span>
           </p>
         </div>
 
         {/* Rodapé */}
         <div className="border-t border-white/[0.06] bg-white/[0.03] px-6 py-3 text-center">
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-text-secondary">
+          <p className="pitpass-label font-mono text-[10px] font-semibold uppercase tracking-[0.2em]">
             Apresente este PitPass na chegada
           </p>
         </div>

@@ -11,6 +11,7 @@ import EnderecoSection from "@/components/EnderecoSection";
 import CtaFinal from "@/components/CtaFinal";
 import Footer from "@/components/Footer";
 import MobileStickyCta from "@/components/MobileStickyCta";
+import MeuPitPass from "@/components/MeuPitPass";
 
 export default function Home() {
   return (
@@ -29,6 +30,7 @@ export default function Home() {
       </main>
       <Footer />
       <MobileStickyCta />
+      <MeuPitPass />
     </SelectionProvider>
   );
 }
