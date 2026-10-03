@@ -17,16 +17,16 @@ export function abrirMeuPitPass() {
   window.dispatchEvent(new Event(EVENTO_ABRIR));
 }
 
-/** Guarda WhatsApp/placa neste aparelho pra preencher a busca depois (conveniência local, nunca enviado). */
-export function lembrarBuscaPitPass(dados: { telefone: string; placa?: string }) {
+/** Guarda o WhatsApp neste aparelho pra preencher a busca depois (conveniência local). */
+export function lembrarBuscaPitPass(dados: { telefone: string }) {
   try {
-    window.localStorage.setItem(CHAVE_LEMBRAR, JSON.stringify({ telefone: dados.telefone, placa: dados.placa ?? "" }));
+    window.localStorage.setItem(CHAVE_LEMBRAR, JSON.stringify({ telefone: dados.telefone }));
   } catch {
     // armazenamento indisponível (modo privado etc.): só não pré-preenche
   }
 }
 
-function lerBuscaLembrada(): { telefone: string; placa: string } | null {
+function lerBuscaLembrada(): { telefone?: string } | null {
   try {
     const bruto = window.localStorage.getItem(CHAVE_LEMBRAR);
     return bruto ? JSON.parse(bruto) : null;
@@ -35,14 +35,9 @@ function lerBuscaLembrada(): { telefone: string; placa: string } | null {
   }
 }
 
-type Modo = "placa" | "codigo";
-
 export default function MeuPitPass() {
   const [aberto, setAberto] = useState(false);
-  const [modo, setModo] = useState<Modo>("placa");
   const [telefone, setTelefone] = useState("");
-  const [placa, setPlaca] = useState("");
-  const [codigo, setCodigo] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [resultados, setResultados] = useState<PitPassPublico[] | null>(null);
@@ -52,10 +47,7 @@ export default function MeuPitPass() {
   useEffect(() => {
     function abrir() {
       const lembrado = lerBuscaLembrada();
-      if (lembrado) {
-        setTelefone((t) => t || lembrado.telefone);
-        setPlaca((p) => p || lembrado.placa);
-      }
+      if (lembrado?.telefone) setTelefone((t) => t || lembrado.telefone || "");
       setAberto(true);
     }
     window.addEventListener(EVENTO_ABRIR, abrir);
@@ -87,7 +79,7 @@ export default function MeuPitPass() {
       const resposta = await fetch("/api/meu-pitpass", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(modo === "placa" ? { telefone, placa } : { telefone, codigo }),
+        body: JSON.stringify({ telefone }),
       });
       const corpo = await resposta.json().catch(() => null);
       if (!resposta.ok) {
@@ -97,7 +89,7 @@ export default function MeuPitPass() {
       const lista: PitPassPublico[] = corpo.agendamentos ?? [];
       setResultados(lista);
       setSelecionado(null);
-      if (lista.length > 0 && modo === "placa") lembrarBuscaPitPass({ telefone, placa });
+      if (lista.length > 0) lembrarBuscaPitPass({ telefone });
     } catch {
       setErro("Não foi possível buscar agora. Tente novamente.");
     } finally {
@@ -109,12 +101,6 @@ export default function MeuPitPass() {
     setResultados(null);
     setSelecionado(null);
     setErro(null);
-  }
-
-  function trocarModo(novo: Modo) {
-    setModo(novo);
-    setErro(null);
-    setResultados(null);
   }
 
   if (!aberto) return null;
@@ -183,21 +169,15 @@ export default function MeuPitPass() {
           <div className="passo-entra mt-5">
             {resultados.length === 0 ? (
               <div className="rounded-lg border border-white/10 bg-asphalt p-5">
-                <p className="font-heading text-base font-bold">Nenhum agendamento encontrado</p>
-                <p className="mt-1 text-sm text-text-secondary">
-                  Não achamos próximos agendamentos com esses dados. Confira o WhatsApp
-                  {modo === "placa" ? " e a placa" : " e o código"} usados no agendamento.
+                <p className="font-heading text-base font-bold">
+                  Nenhum próximo PitPass encontrado para este WhatsApp.
                 </p>
-                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
-                  <button type="button" onClick={novaBusca} className="font-mono text-xs uppercase tracking-widest text-gold underline-offset-4 hover:underline">
-                    Tentar de novo
-                  </button>
-                  {modo === "placa" && (
-                    <button type="button" onClick={() => trocarModo("codigo")} className="font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline">
-                      Buscar com código
-                    </button>
-                  )}
-                </div>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Confira se é o mesmo número usado no agendamento.
+                </p>
+                <button type="button" onClick={novaBusca} className="mt-4 py-1 font-mono text-xs uppercase tracking-widest text-gold underline-offset-4 hover:underline">
+                  Tentar de novo
+                </button>
               </div>
             ) : resultados.length === 1 ? (
               <>
@@ -228,9 +208,7 @@ export default function MeuPitPass() {
         {!selecionado && !resultados && (
           <form onSubmit={buscar} className="passo-entra mt-4">
             <p className="text-sm text-text-secondary">
-              {modo === "placa"
-                ? "Use o WhatsApp e a placa informados no agendamento."
-                : "Use o WhatsApp e o código que aparece no seu PitPass."}
+              Digite o WhatsApp utilizado no agendamento.
             </p>
 
             <div className="mt-5 space-y-4">
@@ -247,36 +225,6 @@ export default function MeuPitPass() {
                   placeholder="(84) 9 9999-9999"
                 />
               </label>
-              {modo === "placa" ? (
-                <label className="block">
-                  <span className="mb-1 block font-mono text-[11px] uppercase tracking-wide text-text-secondary">Placa do veículo</span>
-                  <input
-                    required
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    maxLength={9}
-                    className="campo font-mono text-base uppercase tracking-wider"
-                    value={placa}
-                    onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-                    placeholder="ABC1D23"
-                  />
-                </label>
-              ) : (
-                <label className="block">
-                  <span className="mb-1 block font-mono text-[11px] uppercase tracking-wide text-text-secondary">Código do agendamento</span>
-                  <input
-                    required
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="campo font-mono text-base uppercase tracking-wider"
-                    value={codigo}
-                    onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-                    placeholder="P084-0047"
-                  />
-                </label>
-              )}
             </div>
 
             {erro && (
@@ -290,23 +238,9 @@ export default function MeuPitPass() {
               disabled={carregando}
               className="mt-6 w-full rounded-md bg-gold py-3.5 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110 disabled:opacity-50"
             >
-              {carregando ? "Buscando..." : "Buscar meu PitPass"}
+              {carregando ? "Buscando..." : "Encontrar meu PitPass"}
             </button>
 
-            <div className="mt-6 border-t border-white/10 pt-4 text-center">
-              {modo === "placa" ? (
-                <>
-                  <p className="text-xs text-text-secondary">Não cadastrou a placa?</p>
-                  <button type="button" onClick={() => trocarModo("codigo")} className="mt-1 font-mono text-xs uppercase tracking-widest text-gold underline-offset-4 hover:underline">
-                    Buscar com código
-                  </button>
-                </>
-              ) : (
-                <button type="button" onClick={() => trocarModo("placa")} className="font-mono text-xs uppercase tracking-widest text-gold underline-offset-4 hover:underline">
-                  Buscar com a placa
-                </button>
-              )}
-            </div>
           </form>
         )}
       </div>
@@ -363,7 +297,7 @@ function ResumoAgendamento({
             <span className="pitpass-ponto h-1.5 w-1.5 rounded-full" aria-hidden="true" />
             {item.status}
           </span>
-          <span className="pitpass-acento font-mono text-[11px] font-semibold uppercase tracking-widest">Ver PitPass →</span>
+          <span className="pitpass-acento font-mono text-[11px] font-semibold uppercase tracking-widest">Abrir PitPass →</span>
         </div>
       </div>
     </button>

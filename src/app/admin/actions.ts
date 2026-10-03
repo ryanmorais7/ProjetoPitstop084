@@ -8,7 +8,12 @@ import { horariosBloqueados, StatusAgendamento } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { COOKIE_SESSAO, criarTokenSessao, exigirSessaoAdmin, senhaValida } from "@/lib/adminAuth";
 import { atualizarStatus, registrarCheckin, iniciarAtendimento } from "@/lib/bookings";
-import { buscarAgendamentoPorCodigo, buscarAgendamentoPorToken } from "@/lib/checkin";
+import {
+  AgendamentoRecepcao,
+  buscarAgendamentoPorCodigo,
+  buscarAgendamentoPorToken,
+  buscarAgendamentosRecepcao,
+} from "@/lib/checkin";
 import { interpretarLeituraPitPass } from "@/lib/pitpass";
 import { horariosAgendamento } from "@/lib/data";
 import { dataValidaParaAgendar } from "@/lib/agenda";
@@ -58,8 +63,10 @@ export async function atualizarStatusAgendamento(id: number, status: StatusAgend
   revalidarAtendimento(id);
 }
 
-export async function fazerCheckin(id: number) {
+/** O QR identifica o agendamento; a placa confirma o veículo. Sem a conferência marcada na ficha, não há check-in. */
+export async function fazerCheckin(id: number, formData: FormData) {
   await exigirSessaoAdmin();
+  if (formData.get("placaConferida") !== "on") return;
   await registrarCheckin(id);
   revalidarAtendimento(id);
 }
@@ -70,32 +77,41 @@ export async function iniciarAtendimentoAgendamento(id: number) {
   revalidarAtendimento(id);
 }
 
-export type ResultadoLeituraPitPass = { ok: true; id: number } | { ok: false; erro: string };
+export type ResultadoLeituraPitPass =
+  | { ok: true; id: number }
+  | { ok: false; erro: string; candidatos?: AgendamentoRecepcao[] };
 
 /**
  * Resolve o conteúdo lido do QR (URL /checkin/<token>) ou o código digitado (P084-XXXX)
- * para o id do agendamento. Só funciona com sessão admin.
+ * para o id do agendamento. Se não for nenhum dos dois, cai na busca interna por nome,
+ * WhatsApp, placa ou código do cliente. Só funciona com sessão admin.
  */
 export async function localizarPitPass(texto: string): Promise<ResultadoLeituraPitPass> {
   await exigirSessaoAdmin();
-  const referencia = interpretarLeituraPitPass(String(texto ?? ""));
-  if (!referencia) {
-    return { ok: false, erro: "Isso não parece um PitPass. Confira o código (ex.: P084-0044)." };
+  const bruto = String(texto ?? "");
+  const referencia = interpretarLeituraPitPass(bruto);
+  if (referencia) {
+    const registro =
+      referencia.tipo === "token"
+        ? await buscarAgendamentoPorToken(referencia.valor)
+        : await buscarAgendamentoPorCodigo(referencia.valor);
+    if (registro) return { ok: true, id: registro.id };
+    // link de QR que não existe não é termo de busca
+    if (bruto.includes("/checkin/")) {
+      return { ok: false, erro: "QR não reconhecido. Busque pelo código P084, nome, WhatsApp ou placa." };
+    }
   }
-  const registro =
-    referencia.tipo === "token"
-      ? await buscarAgendamentoPorToken(referencia.valor)
-      : await buscarAgendamentoPorCodigo(referencia.valor);
-  if (!registro) {
-    return {
-      ok: false,
-      erro:
-        referencia.tipo === "codigo"
-          ? `Nenhum agendamento com o código ${referencia.valor}.`
-          : "QR não reconhecido. Tente digitar o código P084.",
-    };
-  }
-  return { ok: true, id: registro.id };
+
+  const candidatos = await buscarAgendamentosRecepcao(bruto);
+  if (candidatos.length === 1) return { ok: true, id: candidatos[0].id };
+  if (candidatos.length > 1) return { ok: false, erro: "Mais de um agendamento encontrado. Escolha abaixo.", candidatos };
+  return {
+    ok: false,
+    erro:
+      referencia?.tipo === "codigo"
+        ? `Nenhum agendamento com o código ${referencia.valor}.`
+        : "Nenhum próximo agendamento encontrado. Tente o código P084, nome, WhatsApp ou placa.",
+  };
 }
 
 export async function bloquearHorario(formData: FormData) {

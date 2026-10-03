@@ -4,12 +4,13 @@ import { agendamentos } from "@/db/schema";
 import { hojeIso } from "./agenda";
 import { PlanoId, portesVeiculo, VehicleSize } from "./data";
 import { garantirTokenCheckin, urlCheckin } from "./checkin";
-import { normalizarCodigoPitPass } from "./pitpass";
 
 /**
- * "Meu PitPass": o cliente reencontra os próximos agendamentos sem login.
- * Chave = WhatsApp + (placa OU código P084). Nunca nome. A resposta tem SÓ o que
- * já está impresso no PitPass dele; nada de observações, endereço, preço ou histórico.
+ * "Meu PitPass": o cliente reencontra os próximos agendamentos sem login, só com o WhatsApp
+ * do agendamento. A busca é sempre server-side e a resposta tem SÓ o que já está impresso no
+ * PitPass (com o nome reduzido ao primeiro nome); nada de telefone, placa, observações,
+ * endereço, preço ou histórico. O QR devolvido é o mesmo token salvo no agendamento.
+ * Como só o telefone abre o PitPass, o QR sozinho não libera nada: a recepção confere a placa.
  */
 
 export interface PitPassPublico {
@@ -36,42 +37,20 @@ export function normalizarTelefoneBusca(entrada: string): string | null {
   return digitos.length === 10 || digitos.length === 11 ? digitos : null;
 }
 
-/**
- * Maiúsculas, sem espaço/hífen ("abc-1d23" → "ABC1D23"). Placa BR tem 7 caracteres, mas a busca
- * aceita 5–8 porque o cadastro nunca validou o formato (precisa bater exatamente com o salvo).
- */
-export function normalizarPlacaBusca(entrada: string): string | null {
-  const placa = entrada.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return placa.length >= 5 && placa.length <= 8 ? placa : null;
+/** Valida e normaliza a entrada crua; null = WhatsApp inválido. */
+export function prepararBusca(corpo: unknown): string | null {
+  const { telefone } = (corpo ?? {}) as Record<string, unknown>;
+  return typeof telefone === "string" ? normalizarTelefoneBusca(telefone) : null;
 }
 
-export type BuscaPitPass =
-  | { tipo: "placa"; telefone: string; placa: string }
-  | { tipo: "codigo"; telefone: string; codigo: string };
-
-/** Valida e normaliza a entrada crua; null = dados inválidos. */
-export function prepararBusca(corpo: unknown): BuscaPitPass | null {
-  const { telefone, placa, codigo } = (corpo ?? {}) as Record<string, unknown>;
-  const tel = typeof telefone === "string" ? normalizarTelefoneBusca(telefone) : null;
-  if (!tel) return null;
-  if (typeof codigo === "string" && codigo.trim()) {
-    const cod = normalizarCodigoPitPass(codigo);
-    return cod ? { tipo: "codigo", telefone: tel, codigo: cod } : null;
-  }
-  if (typeof placa === "string") {
-    const pl = normalizarPlacaBusca(placa);
-    return pl ? { tipo: "placa", telefone: tel, placa: pl } : null;
-  }
-  return null;
+/** Só o primeiro nome sai na busca pública: quem digita o número não precisa do nome completo. */
+function primeiroNome(nome: string): string {
+  return nome.trim().split(/\s+/)[0] ?? "";
 }
 
-export async function buscarMeusPitPass(busca: BuscaPitPass, origem: string): Promise<PitPassPublico[]> {
+export async function buscarMeusPitPass(telefone: string, origem: string): Promise<PitPassPublico[]> {
   // telefone salvo pode ter máscara e/ou 55 na frente: compara só os dígitos
-  const telefoneBate = sql`regexp_replace(${agendamentos.telefone}, '[^0-9]', '', 'g') in (${busca.telefone}, ${"55" + busca.telefone})`;
-  const chave =
-    busca.tipo === "placa"
-      ? sql`upper(regexp_replace(coalesce(${agendamentos.placa}, ''), '[^A-Za-z0-9]', '', 'g')) = ${busca.placa}`
-      : eq(agendamentos.codigo, busca.codigo);
+  const telefoneBate = sql`regexp_replace(${agendamentos.telefone}, '[^0-9]', '', 'g') in (${telefone}, ${"55" + telefone})`;
 
   const registros = await db
     .select()
@@ -79,7 +58,6 @@ export async function buscarMeusPitPass(busca: BuscaPitPass, origem: string): Pr
     .where(
       and(
         telefoneBate,
-        chave,
         gte(agendamentos.dia, hojeIso()),
         ne(agendamentos.status, "cancelado"),
         // concluído só aparece se for de hoje (acabou de sair da loja); o resto é "próximo"
@@ -105,7 +83,7 @@ export async function buscarMeusPitPass(busca: BuscaPitPass, origem: string): Pr
       const ehAssinatura = r.tipoAtendimento === "assinatura";
       return {
         codigo: r.codigo ?? "",
-        nome: r.nome,
+        nome: primeiroNome(r.nome),
         carro: r.carro,
         porteNome: (portesVeiculo[r.categoriaVeiculo as VehicleSize] ?? portesVeiculo.P).nome,
         dia: r.dia,

@@ -178,6 +178,37 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
       <div className="mt-5 space-y-3">
         {etapa === "aguardando" && (
           <form action={fazerCheckin.bind(null, registro.id)}>
+            {/* QR identifica o agendamento; a placa confirma o veículo. O check-in só libera com a conferência marcada. */}
+            <div className="mb-3 rounded-lg border-2 border-gold bg-gold/[0.08] p-5">
+              <p className="font-heading text-base font-bold tracking-wide text-gold">
+                {lido === "1" ? "Confirme a placa do veículo" : "Confira o veículo antes do check-in"}
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-wide text-text-secondary">Veículo cadastrado</p>
+                  <p className="mt-1 font-heading text-lg font-bold leading-tight">{registro.carro}</p>
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-wide text-text-secondary">Placa</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tracking-[0.12em] text-white">
+                    {registro.placa ?? "—"}
+                  </p>
+                </div>
+              </div>
+              {!registro.placa && (
+                <p className="mt-3 text-sm text-text-primary">
+                  Placa não informada no agendamento. Confirme o veículo e os dados com o cliente.
+                </p>
+              )}
+              <p className="mt-4 text-xs text-text-secondary">
+                O QR identifica o agendamento. A placa confirma o veículo. Se o veículo ou a placa não baterem,
+                não faça o check-in.
+              </p>
+              <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-md border border-white/15 bg-asphalt px-4 py-3.5 text-sm">
+                <input type="checkbox" name="placaConferida" required className="h-5 w-5 shrink-0 accent-[#e8ab1f]" />
+                Conferi o veículo e a placa
+              </label>
+            </div>
             <BotaoEtapa>Fazer check-in</BotaoEtapa>
           </form>
         )}

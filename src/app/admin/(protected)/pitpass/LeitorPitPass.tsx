@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { formatarDataCurta } from "@/lib/agenda";
+import type { AgendamentoRecepcao } from "@/lib/checkin";
 import { localizarPitPass } from "../../actions";
 
 /** API nativa (Chrome/Android, Edge). No Safari/iOS não existe: cai no jsQR, carregado só quando preciso. */
@@ -58,6 +61,7 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
   const [iniciandoCamera, setIniciandoCamera] = useState(false);
   const [codigo, setCodigo] = useState(codigoInicial);
   const [erro, setErro] = useState<string | null>(null);
+  const [candidatos, setCandidatos] = useState<AgendamentoRecepcao[]>([]);
   const [buscando, startTransition] = useTransition();
 
   function pararCamera() {
@@ -71,10 +75,13 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
 
   function localizar(texto: string) {
     setErro(null);
+    setCandidatos([]);
     startTransition(async () => {
       const resultado = await localizarPitPass(texto);
       if (resultado.ok) {
         router.push(`/admin/atendimentos/${resultado.id}?lido=1`);
+      } else if (resultado.candidatos?.length) {
+        setCandidatos(resultado.candidatos);
       } else {
         setErro(resultado.erro);
       }
@@ -179,7 +186,7 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
         className="rounded-lg border border-white/10 bg-panel p-5"
       >
         <label htmlFor="codigo-pitpass" className="font-heading text-sm font-bold uppercase tracking-wide">
-          Digitar código
+          Buscar sem QR
         </label>
         <div className="mt-3 flex gap-2">
           <input
@@ -187,8 +194,8 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
             value={codigo}
             // sem toUpperCase: o campo também aceita o link do QR colado, e o token diferencia maiúsculas
             onChange={(e) => setCodigo(e.target.value)}
-            placeholder="P084-0044"
-            autoCapitalize="characters"
+            placeholder="P084-0044, nome, WhatsApp ou placa"
+            autoCapitalize="off"
             autoComplete="off"
             spellCheck={false}
             className="campo font-mono tracking-wide"
@@ -201,8 +208,45 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
             {buscando ? "..." : "Buscar"}
           </button>
         </div>
-        <p className="mt-2 text-xs text-text-secondary">Pode digitar só o número: 44 vira P084-0044.</p>
+        <p className="mt-2 text-xs text-text-secondary">
+          Aceita código P084 (só o número também: 44 vira P084-0044), nome, WhatsApp, placa ou código do
+          cliente (C084).
+        </p>
       </form>
+
+      {candidatos.length > 0 && (
+        <div className="rounded-lg border border-white/10 bg-panel p-5">
+          <p className="font-heading text-sm font-bold uppercase tracking-wide">
+            {candidatos.length} agendamentos encontrados
+          </p>
+          <ul className="mt-3 space-y-2">
+            {candidatos.map((c) => (
+              <li key={c.id}>
+                <Link
+                  href={`/admin/atendimentos/${c.id}?lido=1`}
+                  className="block rounded-md border border-white/10 bg-asphalt px-4 py-3 transition-colors hover:border-gold"
+                >
+                  <span className="flex items-baseline justify-between gap-3 font-mono text-xs uppercase tracking-wide">
+                    <span className="text-white">
+                      {formatarDataCurta(c.dia)} • {c.horario}
+                    </span>
+                    <span className="text-gold">{c.codigo}</span>
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold">{c.nome}</span>
+                  <span className="block text-xs text-text-secondary">
+                    {c.carro} • {c.placa ?? "sem placa"}
+                    {c.servicoNome ? ` • ${c.servicoNome}` : ""}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-center text-xs text-text-secondary">
+        O QR identifica o agendamento. A placa confirma o veículo: confira antes do check-in.
+      </p>
 
       {buscando && <p className="text-center font-mono text-xs uppercase tracking-wide text-text-secondary">Buscando PitPass...</p>}
       {erro && (

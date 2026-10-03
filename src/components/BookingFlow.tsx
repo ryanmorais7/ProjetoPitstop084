@@ -215,7 +215,7 @@ export default function BookingFlow() {
       }
       const dados: { id: number; codigo: string; checkinUrl?: string } = await resposta.json();
       setReserva(dados);
-      lembrarBuscaPitPass({ telefone, placa });
+      lembrarBuscaPitPass({ telefone });
       setEtapa("confirmacao");
     } catch {
       setErro("Não foi possível confirmar o agendamento agora. Tente novamente.");
