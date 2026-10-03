@@ -1,9 +1,9 @@
 import { pitpassTheme, temaDoPlano } from "@/lib/pitpassTheme";
 
 /**
- * Identifica o status do cliente no admin: contorno amarelo pra quem é só cadastro
- * (Pitstop 084), selo preenchido pra quem tem PitPass ativo. A cor do selo vem do mesmo
- * tema do cartão PitPass: amarelo pra Black/Gold, azul frio só pro Diamante.
+ * Identifica o cliente no admin: contorno amarelo pra quem é só cadastro (PitStop 084),
+ * selo preenchido pra quem tem PitPass. A cor do selo vem do mesmo tema do cartão PitPass:
+ * amarelo sólido pra Black/Gold, azul frio só pro Diamante.
  */
 export default function ClienteBadge({
   nomePlano,
@@ -16,7 +16,7 @@ export default function ClienteBadge({
     const tema = pitpassTheme[temaDoPlano(nomePlano.toLowerCase())];
     return (
       <span
-        className={`rounded-sm px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${tema.classeBadge} ${className}`}
+        className={`inline-block whitespace-nowrap rounded px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${tema.classeBadge} ${className}`}
       >
         PitPass • {nomePlano}
       </span>
@@ -25,9 +25,9 @@ export default function ClienteBadge({
 
   return (
     <span
-      className={`rounded-sm border border-gold px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-gold ${className}`}
+      className={`inline-block whitespace-nowrap rounded border border-gold px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-gold-ink ${className}`}
     >
-      Cliente Pitstop 084
+      Cliente PitStop 084
     </span>
   );
 }

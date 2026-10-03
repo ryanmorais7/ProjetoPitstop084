@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { horariosBloqueados, StatusAgendamento } from "@/db/schema";
+import { agendamentos, horariosBloqueados, StatusAgendamento } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { COOKIE_SESSAO, criarTokenSessao, exigirSessaoAdmin, senhaValida } from "@/lib/adminAuth";
 import { atualizarStatus, registrarCheckin, iniciarAtendimento } from "@/lib/bookings";
@@ -51,9 +51,7 @@ export async function logout() {
 }
 
 function revalidarAtendimento(id: number) {
-  revalidatePath("/admin/agendamentos");
-  revalidatePath("/admin/agenda");
-  revalidatePath("/admin/clientes", "layout");
+  revalidatePath("/admin", "layout");
   revalidatePath(`/admin/atendimentos/${id}`);
 }
 
@@ -74,6 +72,31 @@ export async function fazerCheckin(id: number, formData: FormData) {
 export async function iniciarAtendimentoAgendamento(id: number) {
   await exigirSessaoAdmin();
   await iniciarAtendimento(id);
+  revalidarAtendimento(id);
+}
+
+/**
+ * Dados internos do atendimento: quem fechou, quem executou, observações DESTE atendimento
+ * (separadas das preferências do cliente) e o checklist opcional de entrada.
+ */
+export async function salvarOperacaoAtendimento(id: number, formData: FormData) {
+  await exigirSessaoAdmin();
+  const texto = (campo: string) => String(formData.get(campo) ?? "").trim() || null;
+  const checklist = {
+    placa: formData.get("checkPlaca") === "on",
+    veiculo: formData.get("checkVeiculo") === "on",
+    observacoes: formData.get("checkObservacoes") === "on",
+    fotos: formData.get("checkFotos") === "on",
+  };
+  await db
+    .update(agendamentos)
+    .set({
+      responsavelFechamento: texto("responsavelFechamento"),
+      responsavelAtendimento: texto("responsavelAtendimento"),
+      observacoes: texto("observacoes"),
+      checklistEntrada: JSON.stringify(checklist),
+    })
+    .where(eq(agendamentos.id, id));
   revalidarAtendimento(id);
 }
 

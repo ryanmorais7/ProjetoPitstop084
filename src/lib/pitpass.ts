@@ -63,11 +63,61 @@ export function etapaAtendimento(registro: {
 
 export const rotuloEtapa: Record<EtapaAtendimento, string> = {
   aguardando: "Aguardando chegada",
-  checkin: "Check-in feito",
+  checkin: "Check-in realizado",
   em_atendimento: "Em atendimento",
   concluido: "Concluído",
   cancelado: "Cancelado",
 };
+
+/**
+ * Status que a recepção lê na tela. O banco continua com "confirmado" | "concluido" | "cancelado"
+ * + horários reais; aqui só se traduz isso pra operação. Todo agendamento já nasce confirmado
+ * (não existe etapa de aprovação), então "confirmado" = dia futuro e "aguardando" = é hoje
+ * (ou já passou) e o cliente ainda não chegou.
+ */
+export type StatusOperacional = "confirmado" | EtapaAtendimento;
+
+export function statusOperacional(
+  registro: { status: string; dia: string; checkedInAt: Date | string | null; startedAt: Date | string | null },
+  hoje: string
+): StatusOperacional {
+  const etapa = etapaAtendimento(registro);
+  if (etapa === "aguardando" && registro.dia > hoje) return "confirmado";
+  return etapa;
+}
+
+export const rotuloStatus: Record<StatusOperacional, string> = {
+  confirmado: "Confirmado",
+  ...rotuloEtapa,
+};
+
+function minutosDoDia(hora: string): number {
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/** "20 MIN", "1H 15MIN". */
+export function formatarMinutos(minutos: number): string {
+  if (minutos < 60) return `${minutos} MIN`;
+  const resto = minutos % 60;
+  return resto ? `${Math.floor(minutos / 60)}H ${resto}MIN` : `${Math.floor(minutos / 60)}H`;
+}
+
+/**
+ * Quem está chegando ou atrasado HOJE e ainda não fez check-in. `horaAgora` = "HH:MM" em
+ * America/Fortaleza (horaAtualFortaleza). "Próximo" só dentro da próxima hora.
+ */
+export function proximidadeAgendamento(
+  registro: { status: string; dia: string; horario: string; checkedInAt: Date | string | null; startedAt: Date | string | null },
+  hoje: string,
+  horaAgora: string
+): { tipo: "proximo" | "atrasado"; minutos: number } | null {
+  if (registro.dia !== hoje || etapaAtendimento(registro) !== "aguardando") return null;
+  const diferenca = minutosDoDia(registro.horario) - minutosDoDia(horaAgora);
+  if (diferenca < 0) return { tipo: "atrasado", minutos: -diferenca };
+  if (diferenca <= 60) return { tipo: "proximo", minutos: diferenca };
+  return null;
+}
 
 /** "YYYY-MM-DD" de um timestamp real, no fuso da loja (pra exibir com formatarDataCurta). */
 export function dataIsoFortaleza(data: Date | string): string {

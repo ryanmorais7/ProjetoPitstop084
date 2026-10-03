@@ -15,7 +15,12 @@ import {
   servicosAvulsos,
   precoServico,
   VehicleSize,
+  origensCliente,
 } from "@/lib/data";
+
+function origemValida(valor: FormDataEntryValue | null): string | null {
+  return origensCliente.find((o) => o.id === valor)?.id ?? null;
+}
 
 export async function criarClienteManual(formData: FormData) {
   await exigirSessaoAdmin();
@@ -28,11 +33,12 @@ export async function criarClienteManual(formData: FormData) {
 
   if (!nome || !telefone || !modelo) return;
 
-  const { cliente } = await buscarOuCriarCliente({ nome, telefone });
+  const { cliente } = await buscarOuCriarCliente({ nome, telefone, origem: origemValida(formData.get("origem")) });
   await buscarOuCriarVeiculo({ clienteId: cliente.id, modelo, placa, porte });
 
   revalidatePath("/admin/clientes");
-  redirect(`/admin/clientes/${cliente.id}`);
+  // vindo do "Novo agendamento", segue direto pro passo de veículo/serviço
+  redirect(formData.get("destino") === "agendar" ? `/admin/clientes/${cliente.id}/agendar` : `/admin/clientes/${cliente.id}`);
 }
 
 export async function editarCliente(clienteId: number, formData: FormData) {
@@ -50,7 +56,19 @@ export async function editarCliente(clienteId: number, formData: FormData) {
 
   await db
     .update(clientes)
-    .set({ telefone, cep, rua, numero, complemento, bairro, cidade, uf, referencia, updatedAt: new Date() })
+    .set({
+      telefone,
+      cep,
+      rua,
+      numero,
+      complemento,
+      bairro,
+      cidade,
+      uf,
+      referencia,
+      origem: origemValida(formData.get("origem")),
+      updatedAt: new Date(),
+    })
     .where(eq(clientes.id, clienteId));
 
   revalidatePath(`/admin/clientes/${clienteId}`);
@@ -116,6 +134,7 @@ export async function criarAgendamentoManual(
   const observacoes = String(formData.get("observacoes") ?? "").trim() || null;
   const valorAjustadoStr = String(formData.get("valorAjustado") ?? "").trim();
   const motivoAjuste = String(formData.get("motivoAjuste") ?? "").trim() || null;
+  const responsavelFechamento = String(formData.get("responsavelFechamento") ?? "").trim() || null;
 
   if (!clienteId || !nome || !telefone || !carro || !dia || !horario) {
     return { erro: "Preencha os campos obrigatórios." };
@@ -192,6 +211,7 @@ export async function criarAgendamentoManual(
     enderecoSnapshot,
     observacoes,
     origem: "admin",
+    responsavelFechamento,
     assinaturaId,
   });
 
@@ -202,5 +222,5 @@ export async function criarAgendamentoManual(
   revalidatePath("/admin/agendamentos");
   revalidatePath("/admin/agenda");
   revalidatePath(`/admin/clientes/${clienteId}`);
-  redirect(`/admin/clientes/${clienteId}`);
+  redirect(`/admin/atendimentos/${resultado.id}?novo=1`);
 }

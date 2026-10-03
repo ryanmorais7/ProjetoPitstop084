@@ -1,96 +1,96 @@
-import Link from "next/link";
-import { buscarClientes } from "@/lib/clientes";
+import { listarClientesResumo } from "@/lib/adminDados";
+import { origensCliente } from "@/lib/data";
+import ClienteLinha from "@/components/admin/ClienteLinha";
 import { criarClienteManual } from "../../../clientes/actions";
 
-export default async function NovoClientePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
-  const { q } = await searchParams;
-  const termo = q?.trim() ?? "";
-  const resultados = termo ? await buscarClientes(termo) : [];
+export default async function NovoClientePage({ searchParams }: PageProps<"/admin/clientes/novo">) {
+  const params = await searchParams;
+  const termo = typeof params.q === "string" ? params.q.trim() : "";
+  const paraAgendar = params.destino === "agendar";
+  const parecidos = termo ? await listarClientesResumo(termo) : [];
 
   return (
-    <div>
-      <h1 className="font-heading text-2xl font-bold">Novo cliente</h1>
-      <p className="mt-1 text-sm text-text-secondary">Busque antes de cadastrar, pra evitar duplicar um cliente.</p>
+    <div className="mx-auto max-w-2xl">
+      <div className="adm-card p-5 sm:p-6">
+        <h2 className="font-heading text-xl font-bold">Busque antes de cadastrar</h2>
+        <p className="mt-1 text-sm text-adm-muted">Nome, WhatsApp, placa ou código. Evita cliente duplicado.</p>
+        <form method="GET" action="/admin/clientes/novo" role="search" className="mt-4 flex gap-2">
+          {paraAgendar && <input type="hidden" name="destino" value="agendar" />}
+          <label htmlFor="busca-duplicado" className="sr-only">
+            Buscar cliente existente
+          </label>
+          <input
+            id="busca-duplicado"
+            type="search"
+            name="q"
+            defaultValue={termo}
+            placeholder="Nome, WhatsApp, placa ou C084"
+            className="campo"
+          />
+          <button type="submit" className="adm-btn shrink-0">
+            Buscar
+          </button>
+        </form>
+      </div>
 
-      <form method="GET" action="/admin/clientes/novo" className="mt-6 flex gap-2">
-        <input
-          type="text"
-          name="q"
-          defaultValue={termo}
-          placeholder="Nome, telefone ou placa..."
-          autoFocus
-          className="campo"
-        />
-        <button
-          type="submit"
-          className="shrink-0 rounded-sm border border-white/15 px-5 py-2.5 font-heading text-sm font-semibold text-text-primary transition hover:border-gold hover:text-gold"
-        >
-          Buscar
-        </button>
-      </form>
-
-      {resultados.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <p className="font-mono text-xs uppercase tracking-wide text-text-secondary">
-            Já existe alguém parecido. Confira antes de continuar:
-          </p>
-          {resultados.map((cliente) => (
-            <Link
-              key={cliente.id}
-              href={`/admin/clientes/${cliente.id}`}
-              className="block rounded-sm border border-white/10 bg-panel p-4 transition hover:border-gold"
-            >
-              <p className="font-heading text-base font-bold">{cliente.nome}</p>
-              <p className="font-mono text-xs text-text-secondary">
-                {cliente.codigo} · {cliente.telefone}
-              </p>
-            </Link>
-          ))}
-        </div>
+      {parecidos.length > 0 && (
+        <section className="mt-6">
+          <h2 className="adm-rotulo mb-3">Já existe alguém parecido. Confira antes de continuar</h2>
+          <div className="adm-card divide-y divide-adm-line overflow-hidden">
+            {parecidos.map((c) => (
+              <ClienteLinha key={c.id} cliente={c} href={paraAgendar ? `/admin/clientes/${c.id}/agendar` : undefined} />
+            ))}
+          </div>
+        </section>
       )}
 
-      {(termo === "" || resultados.length === 0) && (
-        <form action={criarClienteManual} className="mt-8 max-w-lg space-y-4 rounded-sm border border-white/10 bg-panel p-6">
-          <p className="font-heading text-sm font-bold uppercase tracking-wide text-gold">
-            {termo ? "Não encontrou? Cadastrar novo cliente" : "Cadastrar novo cliente"}
-          </p>
+      <form action={criarClienteManual} className="adm-card mt-6 space-y-4 p-5 sm:p-6">
+        <h2 className="font-heading text-xl font-bold">
+          {parecidos.length > 0 ? "Não é nenhum deles? Cadastrar novo cliente" : "Cadastrar novo cliente"}
+        </h2>
+        {paraAgendar && <input type="hidden" name="destino" value="agendar" />}
+        <label className="block">
+          <span className="adm-rotulo mb-1.5 block">Nome *</span>
+          <input required name="nome" className="campo" placeholder="Nome do cliente" />
+        </label>
+        <label className="block">
+          <span className="adm-rotulo mb-1.5 block">WhatsApp *</span>
+          <input required name="telefone" inputMode="tel" className="campo" placeholder="(84) 9 0000-0000" />
+        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs text-text-secondary">Nome *</span>
-            <input required name="nome" className="campo" placeholder="Nome do cliente" />
+            <span className="adm-rotulo mb-1.5 block">Veículo *</span>
+            <input required name="modelo" className="campo" placeholder="Modelo do carro" />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs text-text-secondary">WhatsApp *</span>
-            <input required name="telefone" className="campo" placeholder="(84) 9 0000-0000" />
+            <span className="adm-rotulo mb-1.5 block">Placa</span>
+            <input name="placa" autoCapitalize="characters" className="campo font-mono uppercase" placeholder="ABC1D23" />
           </label>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="block">
-              <span className="mb-1 block text-xs text-text-secondary">Veículo *</span>
-              <input required name="modelo" className="campo" placeholder="Modelo do carro" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-text-secondary">Placa (opcional)</span>
-              <input name="placa" className="campo" placeholder="ABC1D23" />
-            </label>
-          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs text-text-secondary">Porte</span>
+            <span className="adm-rotulo mb-1.5 block">Porte</span>
             <select name="porte" className="campo" defaultValue="P">
               <option value="P">Hatch / Sedan (P)</option>
               <option value="G">SUV / Pick-up (G)</option>
             </select>
           </label>
-          <button
-            type="submit"
-            className="w-full rounded-sm bg-gold py-3 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110"
-          >
-            Cadastrar cliente
-          </button>
-        </form>
-      )}
+          <label className="block">
+            <span className="adm-rotulo mb-1.5 block">Origem</span>
+            <select name="origem" className="campo" defaultValue="">
+              <option value="">Não informada</option>
+              {origensCliente.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.rotulo}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button type="submit" className="adm-btn adm-btn-primario w-full">
+          {paraAgendar ? "Cadastrar e agendar" : "Cadastrar cliente"}
+        </button>
+      </form>
     </div>
   );
 }

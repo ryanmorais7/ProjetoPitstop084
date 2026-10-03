@@ -26,6 +26,8 @@ export const clientes = pgTable("clientes", {
   referencia: text("referencia"),
   /** Observações permanentes do cliente (ex.: preferências), diferente de observações de um atendimento específico. */
   preferencias: text("preferencias"),
+  /** Por onde o cliente chegou: "site" | "instagram" | "whatsapp" | "presencial" | "indicacao" | "outro". Uso interno. */
+  origem: text("origem"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -115,6 +117,12 @@ export const agendamentos = pgTable(
     observacoes: text("observacoes"),
     /** "landing" | "admin" */
     origem: text("origem").notNull().default("landing"),
+    /** Quem fechou a venda/agendamento (recepção). Só registro, sem cálculo de comissão. */
+    responsavelFechamento: text("responsavel_fechamento"),
+    /** Quem executou o serviço (lavador, detailer). */
+    responsavelAtendimento: text("responsavel_atendimento"),
+    /** JSON com o checklist opcional de entrada: { placa, veiculo, observacoes, fotos } (booleans). */
+    checklistEntrada: text("checklist_entrada"),
     /** Data real do agendamento, formato ISO "YYYY-MM-DD" (não é mais nome de dia da semana). */
     dia: text("dia").notNull(),
     horario: text("horario").notNull(),

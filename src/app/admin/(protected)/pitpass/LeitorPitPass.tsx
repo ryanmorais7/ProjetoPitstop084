@@ -140,18 +140,18 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-lg border border-white/10 bg-panel">
+    <div className="space-y-5">
+      <div className="adm-card overflow-hidden">
         <div className={`relative aspect-square w-full bg-black sm:aspect-video ${cameraAberta ? "" : "hidden"}`}>
           <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
           {/* mira */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-56 w-56 rounded-xl border-2 border-gold/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+            <div className="h-56 w-56 rounded-xl border-2 border-gold shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
           </div>
           <button
             type="button"
             onClick={pararCamera}
-            className="absolute right-3 top-3 rounded-md bg-black/70 px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-white"
+            className="absolute right-3 top-3 min-h-10 rounded-md bg-black/70 px-4 font-mono text-xs uppercase tracking-wide text-white"
           >
             Fechar
           </button>
@@ -160,22 +160,18 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
 
         {!cameraAberta && (
           <div className="p-6 text-center">
-            <p className="text-sm text-text-secondary">Aponte a câmera para o QR do PitPass do cliente.</p>
+            <p className="text-sm text-adm-muted">Aponte a câmera para o QR do PitPass do cliente.</p>
             <button
               type="button"
               onClick={abrirCamera}
               disabled={iniciandoCamera || buscando}
-              className="mt-4 w-full rounded-md bg-gold py-3.5 font-heading text-sm font-semibold tracking-wide text-asphalt transition hover:brightness-110 disabled:opacity-50 sm:w-auto sm:px-10"
+              className="adm-btn adm-btn-primario mt-4 min-h-14 w-full text-base"
             >
               {iniciandoCamera ? "Abrindo câmera..." : "Abrir câmera"}
             </button>
           </div>
         )}
-        {cameraAberta && (
-          <p className="px-4 py-3 text-center font-mono text-xs uppercase tracking-wide text-text-secondary">
-            Procurando QR...
-          </p>
-        )}
+        {cameraAberta && <p className="adm-rotulo px-4 py-3 text-center">Procurando QR...</p>}
       </div>
 
       <form
@@ -183,9 +179,9 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
           e.preventDefault();
           if (codigo.trim()) localizar(codigo);
         }}
-        className="rounded-lg border border-white/10 bg-panel p-5"
+        className="adm-card p-5"
       >
-        <label htmlFor="codigo-pitpass" className="font-heading text-sm font-bold uppercase tracking-wide">
+        <label htmlFor="codigo-pitpass" className="font-heading text-base font-bold">
           Buscar sem QR
         </label>
         <div className="mt-3 flex gap-2">
@@ -198,42 +194,43 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
             autoCapitalize="off"
             autoComplete="off"
             spellCheck={false}
-            className="campo font-mono tracking-wide"
+            className="campo"
           />
-          <button
-            type="submit"
-            disabled={buscando || !codigo.trim()}
-            className="shrink-0 rounded-md border border-gold px-5 font-heading text-sm font-semibold tracking-wide text-gold transition hover:bg-gold hover:text-asphalt disabled:opacity-40"
-          >
+          <button type="submit" disabled={buscando || !codigo.trim()} className="adm-btn shrink-0">
             {buscando ? "..." : "Buscar"}
           </button>
         </div>
-        <p className="mt-2 text-xs text-text-secondary">
-          Aceita código P084 (só o número também: 44 vira P084-0044), nome, WhatsApp, placa ou código do
-          cliente (C084).
+        <p className="mt-2 text-xs text-adm-muted">
+          Aceita código P084 (só o número também: 44 vira P084-0044), nome, WhatsApp, placa ou código do cliente
+          (C084).
         </p>
       </form>
 
+      {buscando && <p className="adm-rotulo text-center">Buscando PitPass...</p>}
+      {erro && (
+        <p role="alert" className="rounded-lg bg-[#fdecea] px-4 py-3 text-sm font-medium text-[#b42318]">
+          {erro}
+        </p>
+      )}
+
       {candidatos.length > 0 && (
-        <div className="rounded-lg border border-white/10 bg-panel p-5">
-          <p className="font-heading text-sm font-bold uppercase tracking-wide">
-            {candidatos.length} agendamentos encontrados
-          </p>
-          <ul className="mt-3 space-y-2">
+        <div>
+          <p className="adm-rotulo mb-3">{candidatos.length} agendamentos encontrados</p>
+          <ul className="adm-card divide-y divide-adm-line overflow-hidden">
             {candidatos.map((c) => (
               <li key={c.id}>
                 <Link
                   href={`/admin/atendimentos/${c.id}?lido=1`}
-                  className="block rounded-md border border-white/10 bg-asphalt px-4 py-3 transition-colors hover:border-gold"
+                  className="block px-4 py-3.5 transition-colors hover:bg-black/[0.025]"
                 >
-                  <span className="flex items-baseline justify-between gap-3 font-mono text-xs uppercase tracking-wide">
-                    <span className="text-white">
+                  <span className="flex items-baseline justify-between gap-3 font-mono text-xs font-medium uppercase tracking-wide">
+                    <span>
                       {formatarDataCurta(c.dia)} • {c.horario}
                     </span>
-                    <span className="text-gold">{c.codigo}</span>
+                    <span className="text-adm-muted">{c.codigo}</span>
                   </span>
                   <span className="mt-1 block text-sm font-semibold">{c.nome}</span>
-                  <span className="block text-xs text-text-secondary">
+                  <span className="block text-xs text-adm-muted">
                     {c.carro} • {c.placa ?? "sem placa"}
                     {c.servicoNome ? ` • ${c.servicoNome}` : ""}
                   </span>
@@ -244,16 +241,9 @@ export default function LeitorPitPass({ codigoInicial = "" }: { codigoInicial?: 
         </div>
       )}
 
-      <p className="text-center text-xs text-text-secondary">
-        O QR identifica o agendamento. A placa confirma o veículo: confira antes do check-in.
+      <p className="rounded-lg bg-[#fdf1cf] px-4 py-3 text-center text-sm font-medium text-[#5f4300]">
+        O QR identifica o agendamento. A placa confirma o veículo.
       </p>
-
-      {buscando && <p className="text-center font-mono text-xs uppercase tracking-wide text-text-secondary">Buscando PitPass...</p>}
-      {erro && (
-        <p role="alert" className="rounded-md border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-300">
-          {erro}
-        </p>
-      )}
     </div>
   );
 }

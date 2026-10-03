@@ -6,6 +6,12 @@
   --color-panel: #17181b;
   --color-gold: #e8ab1f;
   --color-gold-dim: rgba(232, 171, 31, 0.35);
+  /* amarelo legível como TEXTO em fundo claro (admin) */
+  --color-gold-ink: #8a6100;
+  --color-adm-bg: #f6f6f3;
+  --color-adm-ink: #16171a;
+  --color-adm-muted: #666a71;
+  --color-adm-line: rgba(10, 10, 11, 0.1);
   --color-text-primary: #ffffff;
   --color-text-secondary: #a3a8ae;
   --color-light: #f5f4f0;
@@ -20,6 +26,11 @@
   --color-panel: var(--color-panel);
   --color-gold: var(--color-gold);
   --color-gold-dim: var(--color-gold-dim);
+  --color-gold-ink: var(--color-gold-ink);
+  --color-adm-bg: var(--color-adm-bg);
+  --color-adm-ink: var(--color-adm-ink);
+  --color-adm-muted: var(--color-adm-muted);
+  --color-adm-line: var(--color-adm-line);
   --color-text-primary: var(--color-text-primary);
   --color-text-secondary: var(--color-text-secondary);
   --color-light: var(--color-light);
@@ -64,6 +75,23 @@ body {
 
 .campo::placeholder {
   color: var(--color-text-secondary);
+}
+
+/* admin claro: fora de @layer, como o .campo base, pra conseguir sobrescrever */
+.admin .campo {
+  border-radius: 0.5rem;
+  border-color: rgba(10, 10, 11, 0.16);
+  background: #fff;
+  color: var(--color-adm-ink);
+  min-height: 2.75rem;
+}
+
+.admin .campo:focus {
+  border-color: var(--color-adm-ink);
+}
+
+.admin .campo::placeholder {
+  color: #8b8f96;
 }
 
 @keyframes preco-fade {
@@ -217,6 +245,8 @@ body {
 
 /* PitPass: cartão digital. Grafite com luz suave no topo (cor da luz vem do tema), sem neon. */
 .pitpass-cartao {
+  /* o cartão é sempre escuro, mesmo dentro do admin claro */
+  color: #fff;
   position: relative;
   overflow: hidden;
   background:
@@ -344,6 +374,20 @@ body {
   }
 }
 
+/* Menu do admin no celular: entra pela esquerda. */
+@keyframes gaveta-esquerda {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.gaveta-esquerda {
+  animation: gaveta-esquerda 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
 /* Preço: algarismos da fonte de título, tabulares, com a moeda menor e mais leve. */
 .preco {
   font-family: var(--font-heading);
@@ -415,6 +459,140 @@ body {
   color: #dbe7f1;
   background: linear-gradient(135deg, rgba(127, 166, 196, 0.28), rgba(217, 226, 234, 0.12));
   box-shadow: inset 0 0 0 1px rgba(169, 201, 226, 0.6);
+}
+
+/*
+ * ADMIN: central operacional clara. Branco/off-white, texto grafite, amarelo só em ação
+ * principal, seleção, PitPass e alerta. Azul só no PitPass Diamante.
+ */
+.admin {
+  min-height: 100vh;
+  background: var(--color-adm-bg);
+  color: var(--color-adm-ink);
+}
+
+.admin :focus-visible {
+  outline: 2px solid var(--color-adm-ink);
+  outline-offset: 2px;
+}
+
+.adm-card {
+  border: 1px solid var(--color-adm-line);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.adm-rotulo {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-adm-muted);
+}
+
+.adm-btn {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(10, 10, 11, 0.16);
+  border-radius: 0.5rem;
+  background: #fff;
+  padding: 0 0.95rem;
+  font-family: var(--font-heading);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-adm-ink);
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out, filter 0.15s ease-out;
+}
+
+.adm-btn:hover {
+  border-color: var(--color-adm-ink);
+}
+
+.adm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.adm-btn-primario {
+  border-color: var(--color-gold);
+  background: var(--color-gold);
+  color: var(--color-asphalt);
+}
+
+.adm-btn-primario:hover {
+  border-color: var(--color-gold);
+  filter: brightness(1.06);
+}
+
+.adm-btn-perigo {
+  color: #b42318;
+}
+
+.adm-btn-perigo:hover {
+  border-color: #b42318;
+}
+
+.adm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 9999px;
+  padding: 0.2rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.adm-status-confirmado {
+  background: #eef0f2;
+  color: #3b3f45;
+}
+
+.adm-status-aguardando {
+  background: #fdf1cf;
+  color: #7a5600;
+}
+
+.adm-status-checkin {
+  background: var(--color-gold);
+  color: var(--color-asphalt);
+}
+
+.adm-status-em_atendimento {
+  background: var(--color-adm-ink);
+  color: #fff;
+}
+
+.adm-status-concluido {
+  background: #e4f3e8;
+  color: #1c6a35;
+}
+
+.adm-status-cancelado {
+  background: #fdecea;
+  color: #b42318;
+}
+
+.adm-status-inativo {
+  background: #eef0f2;
+  color: #7b7f86;
+}
+
+/* selo Diamante em fundo claro: mesmo azul frio, com contraste de leitura */
+.admin .pitpass-badge-diamante {
+  color: #17476f;
+  background: linear-gradient(135deg, #dcebf7, #f2f6fa);
+  box-shadow: inset 0 0 0 1px #8fb3cf;
 }
 
 /* Recorte lateral de "ingresso" na linha que separa os dados do QR. */

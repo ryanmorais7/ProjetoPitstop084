@@ -13,7 +13,10 @@ export default function DateTimePicker({
   ocupados,
   horaSelecionada,
   onSelecionarHora,
+  claro = false,
 }: {
+  /** Fundo claro (admin). O padrão é o tema escuro da landing. */
+  claro?: boolean;
   datasRapidas: Date[];
   dataSelecionadaIso: string | null;
   onSelecionarData: (iso: string) => void;
@@ -44,7 +47,11 @@ export default function DateTimePicker({
               onClick={() => onSelecionarData(iso)}
               aria-pressed={ativo}
               className={`flex shrink-0 flex-col items-center rounded-sm px-4 py-2 font-heading transition-colors duration-200 ${
-                ativo ? "bg-gold text-asphalt" : "bg-asphalt text-text-secondary hover:text-text-primary"
+                ativo
+                  ? "bg-gold text-asphalt"
+                  : claro
+                  ? "border border-black/15 bg-white text-adm-muted hover:border-black/40 hover:text-adm-ink"
+                  : "bg-asphalt text-text-secondary hover:text-text-primary"
               }`}
             >
               <span className="text-xs">{diaAbreviadoCurto[data.getUTCDay()]}</span>
@@ -56,7 +63,11 @@ export default function DateTimePicker({
         <button
           type="button"
           onClick={abrirOutroDia}
-          className="flex shrink-0 flex-col items-center justify-center rounded-sm border border-white/15 px-4 py-2 font-heading text-xs font-semibold text-text-secondary transition hover:border-gold hover:text-gold"
+          className={`flex shrink-0 flex-col items-center justify-center rounded-sm border px-4 py-2 font-heading text-xs font-semibold transition ${
+            claro
+              ? "border-black/15 bg-white text-adm-muted hover:border-black/40 hover:text-adm-ink"
+              : "border-white/15 text-text-secondary hover:border-gold hover:text-gold"
+          }`}
         >
           Outro dia
           <span aria-hidden="true">📅</span>
@@ -89,9 +100,13 @@ export default function DateTimePicker({
                 aria-pressed={selecionado}
                 className={`flex flex-col items-center justify-center gap-0.5 rounded-sm border px-3 py-3 font-mono text-sm transition-colors duration-200 ${
                   indisponivel
-                    ? "cursor-not-allowed border-transparent bg-white/5 text-text-secondary/40"
+                    ? claro
+                      ? "cursor-not-allowed border-transparent bg-black/[0.04] text-black/30"
+                      : "cursor-not-allowed border-transparent bg-white/5 text-text-secondary/40"
                     : selecionado
                     ? "border-gold bg-gold font-semibold text-asphalt"
+                    : claro
+                    ? "border-black/15 bg-white text-adm-ink hover:border-adm-ink"
                     : "border-transparent bg-asphalt text-text-primary hover:border-gold hover:text-gold"
                 }`}
               >

@@ -1,194 +1,171 @@
 import Link from "next/link";
-import { and, asc, gte, ne, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { agendamentos, assinaturas } from "@/db/schema";
-import { hojeIso, formatarDataCurta } from "@/lib/agenda";
-import { formatarPreco } from "@/lib/format";
-import { linkWhatsapp, planos, PlanoId } from "@/lib/data";
-import { atualizarStatusAgendamento } from "../../actions";
-import ClienteBadge from "@/components/admin/ClienteBadge";
-import { etapaAtendimento, rotuloEtapa, formatarHoraFortaleza } from "@/lib/pitpass";
+import { hojeIso, horaAtualFortaleza } from "@/lib/agenda";
+import {
+  agendamentosDoDia,
+  FiltroAgendamento,
+  filtrosAgendamento,
+  filtrosTipo,
+  FiltroTipo,
+  listarAgendamentos,
+  planosAtivosPorCliente,
+} from "@/lib/adminDados";
+import { statusOperacional } from "@/lib/pitpass";
+import AgendamentoCard from "@/components/admin/AgendamentoCard";
 
-interface AdicionalJson {
-  id: string;
-  nome: string;
-  preco: number | null;
-}
-
-function descreverServicos(registro: typeof agendamentos.$inferSelect): string {
-  if (registro.tipoAtendimento === "assinatura") {
-    return registro.servicoNome ?? (registro.plano ? registro.plano.toUpperCase() : "-");
-  }
-
-  const partes = [registro.servicoNome ?? "Ducha Pitstop"];
-  if (registro.servicosAdicionais) {
-    try {
-      const adicionais = JSON.parse(registro.servicosAdicionais) as AdicionalJson[];
-      partes.push(...adicionais.map((a) => a.nome));
-    } catch {
-      // servicosAdicionais mal formado, ignora
-    }
-  }
-  return partes.join(" + ");
-}
-
-const estiloStatus: Record<string, string> = {
-  confirmado: "text-gold",
-  concluido: "text-text-secondary",
-  cancelado: "text-red-400 line-through",
+const vazioPorFiltro: Record<FiltroAgendamento, string> = {
+  hoje: "Nenhum agendamento hoje.",
+  proximos: "Nenhum agendamento pela frente.",
+  atendimento: "Nenhum veículo em atendimento agora.",
+  concluidos: "Nenhum atendimento concluído ainda.",
+  cancelados: "Nenhum agendamento cancelado.",
+  todos: "Nenhum agendamento por aqui.",
 };
 
-export default async function AgendamentosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ ver?: string }>;
-}) {
-  const { ver } = await searchParams;
-  const mostrarTodos = ver === "todas";
+export default async function AgendamentosPage({ searchParams }: PageProps<"/admin/agendamentos">) {
+  const params = await searchParams;
+  const filtro = (filtrosAgendamento.find((f) => f.id === params.f)?.id ?? "hoje") as FiltroAgendamento;
+  const tipo = (filtrosTipo.find((t) => t.id === params.t)?.id ?? "todos") as FiltroTipo;
+  const q = typeof params.q === "string" ? params.q.trim() : "";
+  // buscar é procurar em tudo: com termo, o filtro de período não esconde resultado
+  const filtroEfetivo: FiltroAgendamento = q ? "todos" : filtro;
 
-  const [registros, assinaturasAtivas] = await Promise.all([
-    db
-      .select()
-      .from(agendamentos)
-      .where(
-        mostrarTodos
-          ? undefined
-          : and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado"))
-      )
-      .orderBy(asc(agendamentos.dia), asc(agendamentos.horario)),
-    db.select().from(assinaturas).where(eq(assinaturas.status, "ativo")),
+  const hoje = hojeIso();
+  const horaAgora = horaAtualFortaleza();
+  const [registros, doDia] = await Promise.all([
+    listarAgendamentos({ filtro: filtroEfetivo, tipo, q }),
+    agendamentosDoDia(hoje),
   ]);
+  const planosAtivos = await planosAtivosPorCliente(registros.map((r) => r.clienteId));
 
-  const assinaturaPorCliente = new Map(assinaturasAtivas.map((a) => [a.clienteId, a]));
+  const contar = (status: string) => doDia.filter((r) => statusOperacional(r, hoje) === status).length;
+  const resumo = [
+    { rotulo: "Hoje", valor: doDia.length },
+    { rotulo: "Aguardando", valor: contar("aguardando") },
+    { rotulo: "Em atendimento", valor: contar("em_atendimento") },
+    { rotulo: "Concluídos", valor: contar("concluido") },
+  ];
+
+  const link = (f: FiltroAgendamento, t: FiltroTipo) => {
+    const p = new URLSearchParams();
+    if (f !== "hoje") p.set("f", f);
+    if (t !== "todos") p.set("t", t);
+    const qs = p.toString();
+    return qs ? `/admin/agendamentos?${qs}` : "/admin/agendamentos";
+  };
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-bold">Agendamentos</h1>
-        <div className="flex gap-2 font-mono text-xs uppercase tracking-wide">
-          <Link
-            href="/admin/agendamentos"
-            className={`rounded-sm px-3 py-1.5 ${!mostrarTodos ? "bg-gold text-asphalt" : "border border-white/15 text-text-secondary"}`}
-          >
-            Próximos
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <dl className="flex flex-wrap gap-x-6 gap-y-2">
+          {resumo.map((r) => (
+            <div key={r.rotulo} className="flex items-baseline gap-2">
+              <dd className="font-heading text-2xl font-bold tabular-nums">{r.valor}</dd>
+              <dt className="adm-rotulo">{r.rotulo}</dt>
+            </div>
+          ))}
+        </dl>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/agendamentos/novo" className="adm-btn adm-btn-primario">
+            + Novo agendamento
           </Link>
-          <Link
-            href="/admin/agendamentos?ver=todas"
-            className={`rounded-sm px-3 py-1.5 ${mostrarTodos ? "bg-gold text-asphalt" : "border border-white/15 text-text-secondary"}`}
-          >
-            Todos
+          <Link href="/admin/pitpass" className="adm-btn">
+            Ler PitPass
           </Link>
         </div>
       </div>
 
-      {registros.length === 0 && (
-        <p className="text-sm text-text-secondary">Nenhum agendamento por aqui.</p>
-      )}
+      <form method="GET" action="/admin/agendamentos" role="search" className="mt-6 flex gap-2">
+        <label htmlFor="busca-agendamentos" className="sr-only">
+          Buscar agendamentos
+        </label>
+        <input
+          id="busca-agendamentos"
+          type="search"
+          name="q"
+          defaultValue={q}
+          placeholder="Buscar nome, placa, WhatsApp ou P084"
+          className="campo"
+        />
+        {tipo !== "todos" && <input type="hidden" name="t" value={tipo} />}
+        <button type="submit" className="adm-btn shrink-0">
+          Buscar
+        </button>
+      </form>
 
-      <div className="space-y-3">
-        {registros.map((r) => {
-          const assinatura = r.clienteId ? assinaturaPorCliente.get(r.clienteId) : null;
-          const nomePlano = assinatura ? planos[assinatura.plano as PlanoId]?.nome : null;
-
+      <nav aria-label="Período" className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0">
+        {filtrosAgendamento.map((f) => {
+          const selecionado = !q && f.id === filtro;
           return (
-            <div
-              key={r.id}
-              className="rounded-sm border border-white/10 bg-panel p-4 sm:flex sm:items-center sm:justify-between sm:gap-4"
+            <Link
+              key={f.id}
+              href={link(f.id, tipo)}
+              aria-current={selecionado ? "true" : undefined}
+              className={`flex min-h-10 shrink-0 items-center rounded-full border px-4 font-heading text-xs font-bold uppercase tracking-[0.1em] transition-colors ${
+                selecionado
+                  ? "border-adm-ink bg-adm-ink text-white"
+                  : "border-black/15 bg-white text-adm-muted hover:border-black/40 hover:text-adm-ink"
+              }`}
             >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm">
-                  {r.codigo && (
-                    <Link href={`/admin/atendimentos/${r.id}`} className="text-white hover:text-gold">
-                      {r.codigo}
-                    </Link>
-                  )}
-                  <span className="text-text-secondary">·</span>
-                  <span className="text-gold">{formatarDataCurta(r.dia)}</span>
-                  <span className="text-text-secondary">·</span>
-                  <span>{r.horario}</span>
-                  <span className={`text-xs uppercase ${estiloStatus[r.status] ?? ""}`}>
-                    {r.status === "confirmado" ? rotuloEtapa[etapaAtendimento(r)] : r.status}
-                  </span>
-                </div>
-                {(r.checkedInAt || r.startedAt || r.completedAt) && (
-                  <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-text-secondary">
-                    {[
-                      r.checkedInAt && `Check-in ${formatarHoraFortaleza(r.checkedInAt)}`,
-                      r.startedAt && `Início ${formatarHoraFortaleza(r.startedAt)}`,
-                      r.completedAt && `Concluído ${formatarHoraFortaleza(r.completedAt)}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                )}
-
-                {r.clienteId ? (
-                  <Link
-                    href={`/admin/clientes/${r.clienteId}`}
-                    className="mt-1 block font-heading text-base font-bold hover:text-gold"
-                  >
-                    {r.nome}
-                  </Link>
-                ) : (
-                  <p className="mt-1 font-heading text-base font-bold">{r.nome}</p>
-                )}
-
-                <ClienteBadge nomePlano={nomePlano} className="mt-1 inline-block" />
-
-                <p className="mt-1 text-sm text-text-secondary">
-                  {r.carro}
-                  {r.placa ? ` · ${r.placa}` : ""} · {r.categoriaVeiculo === "G" ? "SUV / Pick-up" : "Hatch / Sedan"}
-                </p>
-                <p className="mt-1 text-sm text-text-primary">{descreverServicos(r)}</p>
-                {r.tipoAtendimento === "assinatura" ? (
-                  <p className="mt-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                    Benefício do plano
-                  </p>
-                ) : (
-                  r.preco && (
-                    <p className="mt-1 font-mono text-sm text-gold">{formatarPreco(Number(r.preco))}</p>
-                  )
-                )}
-                <a
-                  href={linkWhatsapp(`Olá ${r.nome}! Aqui é da PitStop084, sobre seu agendamento.`)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 inline-block font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 hover:text-gold hover:underline"
-                >
-                  {r.telefone} · WhatsApp
-                </a>
-              </div>
-
-              {r.status === "confirmado" && (
-                <div className="mt-4 flex shrink-0 flex-wrap gap-2 sm:mt-0">
-                  <Link
-                    href={`/admin/atendimentos/${r.id}`}
-                    className="rounded-sm border border-gold/60 px-4 py-2 font-mono text-xs uppercase tracking-wide text-gold transition hover:bg-gold hover:text-asphalt"
-                  >
-                    {etapaAtendimento(r) === "aguardando" ? "Check-in" : "Abrir ficha"}
-                  </Link>
-                  <form action={atualizarStatusAgendamento.bind(null, r.id, "concluido")}>
-                    <button
-                      type="submit"
-                      className="rounded-sm border border-white/15 px-4 py-2 font-mono text-xs uppercase tracking-wide text-text-primary transition hover:border-gold hover:text-gold"
-                    >
-                      Concluir
-                    </button>
-                  </form>
-                  <form action={atualizarStatusAgendamento.bind(null, r.id, "cancelado")}>
-                    <button
-                      type="submit"
-                      className="rounded-sm border border-white/15 px-4 py-2 font-mono text-xs uppercase tracking-wide text-text-secondary transition hover:border-red-400 hover:text-red-400"
-                    >
-                      Cancelar
-                    </button>
-                  </form>
-                </div>
-              )}
-            </div>
+              {f.rotulo}
+            </Link>
           );
         })}
-      </div>
+      </nav>
+      <nav aria-label="Tipo de cliente" className="-mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0">
+        {filtrosTipo.map((t) => {
+          const selecionado = t.id === tipo;
+          const p = new URLSearchParams();
+          if (q) p.set("q", q);
+          else if (filtro !== "hoje") p.set("f", filtro);
+          if (t.id !== "todos") p.set("t", t.id);
+          const qs = p.toString();
+          return (
+            <Link
+              key={t.id}
+              href={qs ? `/admin/agendamentos?${qs}` : "/admin/agendamentos"}
+              aria-current={selecionado ? "true" : undefined}
+              className={`flex min-h-9 shrink-0 items-center rounded-full px-3 font-mono text-[11px] font-medium uppercase tracking-wide transition-colors ${
+                selecionado ? "bg-gold/25 text-adm-ink" : "text-adm-muted hover:bg-black/[0.05] hover:text-adm-ink"
+              }`}
+            >
+              {t.rotulo}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {q && (
+        <p className="mt-5 text-sm text-adm-muted">
+          {registros.length} resultado{registros.length === 1 ? "" : "s"} para “{q}” em todos os períodos.{" "}
+          <Link href={link(filtro, tipo)} className="font-medium text-adm-ink underline underline-offset-4">
+            Limpar busca
+          </Link>
+        </p>
+      )}
+
+      {registros.length === 0 ? (
+        <div className="mt-5 rounded-xl border border-dashed border-black/15 px-5 py-12 text-center">
+          <p className="font-heading text-lg font-bold">{q ? "Nenhum agendamento encontrado." : vazioPorFiltro[filtro]}</p>
+          <p className="mt-1 text-sm text-adm-muted">
+            {q ? "Confira o termo ou tente a placa, o WhatsApp ou o código P084." : "Quando houver, eles aparecem aqui."}
+          </p>
+          <Link href="/admin/agendamentos/novo" className="adm-btn mt-5">
+            + Novo agendamento
+          </Link>
+        </div>
+      ) : (
+        <div className="mt-5 space-y-3">
+          {registros.map((r) => (
+            <AgendamentoCard
+              key={r.id}
+              registro={r}
+              planoAtivoDoCliente={r.clienteId ? planosAtivos.get(r.clienteId) : null}
+              hoje={hoje}
+              horaAgora={horaAgora}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

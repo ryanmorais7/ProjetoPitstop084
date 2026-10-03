@@ -466,6 +466,23 @@ export function linkWhatsapp(mensagem: string) {
   return `https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensagem)}`;
 }
 
+/** Conversa com um CLIENTE (o admin usa isso; `linkWhatsapp` acima fala com a loja). */
+export function linkWhatsappPara(telefone: string, mensagem: string) {
+  let digitos = telefone.replace(/D/g, "");
+  if (digitos.length <= 11) digitos = "55" + digitos;
+  return `https://wa.me/${digitos}?text=${encodeURIComponent(mensagem)}`;
+}
+
+/** Por onde o cliente chegou (campo interno do admin). */
+export const origensCliente = [
+  { id: "site", rotulo: "Site" },
+  { id: "instagram", rotulo: "Instagram" },
+  { id: "whatsapp", rotulo: "WhatsApp" },
+  { id: "presencial", rotulo: "Presencial" },
+  { id: "indicacao", rotulo: "Indicação" },
+  { id: "outro", rotulo: "Outro" },
+] as const;
+
 export const enderecoPitstop = {
   nome: "PitStop084",
   linha1: "Av. Presidente Café Filho, 522",

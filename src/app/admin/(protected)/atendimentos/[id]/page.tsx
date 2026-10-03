@@ -3,34 +3,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { agendamentos, assinaturas, beneficioUsos } from "@/db/schema";
-import { formatarDataCurta } from "@/lib/agenda";
+import { agendamentos, assinaturas, beneficioUsos, clientes } from "@/db/schema";
+import { formatarDataCurta, hojeIso, horaAtualFortaleza } from "@/lib/agenda";
 import { formatarPreco } from "@/lib/format";
-import { planos, PlanoId, portesVeiculo, VehicleSize, linkWhatsapp } from "@/lib/data";
+import { planos, PlanoId, portesVeiculo, VehicleSize } from "@/lib/data";
+import { whatsappDoCliente } from "@/lib/adminDados";
 import { garantirTokenCheckin, origemDaRequisicao, urlCheckin } from "@/lib/checkin";
-import {
-  etapaAtendimento,
-  rotuloEtapa,
-  formatarHoraFortaleza,
-  dataIsoFortaleza,
-  EtapaAtendimento,
-} from "@/lib/pitpass";
-import { atualizarStatusAgendamento, fazerCheckin, iniciarAtendimentoAgendamento } from "../../../actions";
-import CarSparkMark from "@/components/CarSparkMark";
+import { statusOperacional, formatarHoraFortaleza, dataIsoFortaleza } from "@/lib/pitpass";
 import QrCode from "@/components/QrCode";
-import { pitpassTheme, temaDoPlano } from "@/lib/pitpassTheme";
+import ClienteBadge from "@/components/admin/ClienteBadge";
+import { StatusChip, ProximidadeChip, nomePlanoDoAgendamento } from "@/components/admin/AgendamentoCard";
+import AcoesAgendamento from "@/components/admin/AcoesAgendamento";
+import CheckinPlaca from "@/components/admin/CheckinPlaca";
+import FormComAviso, { BotaoEnviar } from "@/components/admin/FormComAviso";
+import { salvarOperacaoAtendimento } from "../../../actions";
 
 interface AdicionalJson {
   nome: string;
+  preco: number | null;
 }
-
-const estiloEtapa: Record<EtapaAtendimento, string> = {
-  aguardando: "border-white/15 text-text-secondary",
-  checkin: "border-gold/60 text-gold",
-  em_atendimento: "border-gold bg-gold text-asphalt",
-  concluido: "border-white/15 text-text-primary",
-  cancelado: "border-red-400/40 text-red-400",
-};
 
 const rotuloUsoBeneficio: Record<string, string> = {
   reservado: "Reservado",
@@ -38,16 +29,23 @@ const rotuloUsoBeneficio: Record<string, string> = {
   liberado: "Liberado (não contou)",
 };
 
+const itensChecklist = [
+  { campo: "checkPlaca", chave: "placa", rotulo: "Placa conferida" },
+  { campo: "checkVeiculo", chave: "veiculo", rotulo: "Veículo conferido" },
+  { campo: "checkObservacoes", chave: "observacoes", rotulo: "Observações registradas" },
+  { campo: "checkFotos", chave: "fotos", rotulo: "Fotos de entrada, quando necessário" },
+] as const;
+
 export default async function AtendimentoPage({ params, searchParams }: PageProps<"/admin/atendimentos/[id]">) {
   const { id } = await params;
-  const { lido } = await searchParams;
+  const { lido, novo } = await searchParams;
   const agendamentoId = Number(id);
   if (!Number.isInteger(agendamentoId)) notFound();
 
   const [registro] = await db.select().from(agendamentos).where(eq(agendamentos.id, agendamentoId));
   if (!registro) notFound();
 
-  const [token, origem, usos, assinaturaAtiva] = await Promise.all([
+  const [token, origem, usos, assinaturaAtiva, cliente] = await Promise.all([
     garantirTokenCheckin(registro),
     origemDaRequisicao(),
     db.select().from(beneficioUsos).where(eq(beneficioUsos.agendamentoId, registro.id)),
@@ -58,20 +56,38 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
           .where(and(eq(assinaturas.clienteId, registro.clienteId), eq(assinaturas.status, "ativo")))
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
+    registro.clienteId
+      ? db
+          .select({ preferencias: clientes.preferencias })
+          .from(clientes)
+          .where(eq(clientes.id, registro.clienteId))
+          .then((r) => r[0] ?? null)
+      : Promise.resolve(null),
   ]);
 
-  const etapa = etapaAtendimento(registro);
+  const hoje = hojeIso();
+  const status = statusOperacional(registro, hoje);
   const ehAssinatura = registro.tipoAtendimento === "assinatura";
-  const planoId = (registro.plano ?? assinaturaAtiva?.plano ?? null) as PlanoId | null;
-  const nomePlano = planoId ? planos[planoId]?.nome : null;
+  const planoAtivo = assinaturaAtiva ? (planos[assinaturaAtiva.plano as PlanoId]?.nome ?? null) : null;
+  const nomePlano = nomePlanoDoAgendamento(registro, planoAtivo);
   const porte = portesVeiculo[(registro.categoriaVeiculo as VehicleSize) ?? "P"] ?? portesVeiculo.P;
+  const aguardandoCheckin = status === "aguardando";
 
-  let adicionais: string[] = [];
+  let adicionais: AdicionalJson[] = [];
   if (registro.servicosAdicionais) {
     try {
-      adicionais = (JSON.parse(registro.servicosAdicionais) as AdicionalJson[]).map((a) => a.nome);
+      adicionais = JSON.parse(registro.servicosAdicionais) as AdicionalJson[];
     } catch {
       // JSON mal formado, ignora
+    }
+  }
+
+  let checklist: Record<string, boolean> = {};
+  if (registro.checklistEntrada) {
+    try {
+      checklist = JSON.parse(registro.checklistEntrada) as Record<string, boolean>;
+    } catch {
+      // checklist antigo mal formado: começa vazio
     }
   }
 
@@ -83,227 +99,235 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
   ];
 
   return (
-    <div className="mx-auto max-w-lg">
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          href="/admin/pitpass"
-          className="font-mono text-xs uppercase tracking-wide text-text-secondary hover:text-gold"
-        >
-          ← Ler outro PitPass
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/admin/agendamentos" className="inline-flex min-h-9 items-center text-sm text-adm-muted underline-offset-4 hover:text-adm-ink hover:underline">
+          ← Agendamentos
         </Link>
-        <Link
-          href="/admin/agendamentos"
-          className="font-mono text-xs uppercase tracking-wide text-text-secondary hover:text-gold"
-        >
-          Agendamentos
+        <Link href="/admin/pitpass" className="inline-flex min-h-9 items-center text-sm text-adm-muted underline-offset-4 hover:text-adm-ink hover:underline">
+          Ler outro PitPass
         </Link>
       </div>
 
       {lido === "1" && (
-        <p className="pitpass-entra mt-5 font-heading text-sm font-bold tracking-[0.2em] text-gold">
-          ✓ PitPass encontrado
+        <p className="passo-entra rounded-lg bg-adm-ink px-4 py-3 font-heading text-sm font-bold tracking-[0.16em] text-white">
+          <span className="mr-2 text-gold">✓</span>PitPass encontrado
+        </p>
+      )}
+      {novo === "1" && (
+        <p className="passo-entra rounded-lg bg-[#e4f3e8] px-4 py-3 text-sm font-semibold text-[#1c6a35]">
+          Agendamento criado. O horário já está reservado na agenda e na landing.
         </p>
       )}
 
       {/* Identificação */}
-      <div className={`pitpass-cartao ${pitpassTheme[temaDoPlano(ehAssinatura ? planoId : null)].classe} mt-3 rounded-xl p-5`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <CarSparkMark className="h-5 w-5 text-white" />
-            <span className="font-heading text-xs font-bold tracking-[0.18em]">
-              PITPASS
-              {ehAssinatura && nomePlano && <span className="pitpass-acento"> • {nomePlano.toUpperCase()}</span>}
-            </span>
+      <section className="adm-card p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-mono text-sm font-semibold tracking-wide">{registro.codigo}</p>
+            <p className="mt-2 flex items-baseline gap-3">
+              <span className="font-heading text-4xl font-bold leading-none tabular-nums">{registro.horario}</span>
+              <span className="font-mono text-xs font-medium uppercase tracking-wide text-adm-muted">
+                {formatarDataCurta(registro.dia)}
+              </span>
+            </p>
           </div>
-          <span className="font-mono text-sm font-semibold text-white">{registro.codigo}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <ProximidadeChip registro={registro} hoje={hoje} horaAgora={horaAtualFortaleza()} />
+            <StatusChip status={status} />
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full border px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide ${estiloEtapa[etapa]}`}
-          >
-            {rotuloEtapa[etapa]}
-          </span>
-        </div>
-
-        <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <Dado rotulo="Cliente" largo>
+        <div className="mt-5 border-t border-adm-line pt-5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {registro.clienteId ? (
-              <Link href={`/admin/clientes/${registro.clienteId}`} className="font-semibold hover:text-gold">
+              <Link
+                href={`/admin/clientes/${registro.clienteId}`}
+                className="font-heading text-2xl font-bold leading-tight underline-offset-4 hover:underline"
+              >
                 {registro.nome}
               </Link>
             ) : (
-              <span className="font-semibold">{registro.nome}</span>
+              <p className="font-heading text-2xl font-bold leading-tight">{registro.nome}</p>
             )}
-          </Dado>
-          <Dado rotulo="Tipo">{ehAssinatura ? "Assinatura PitPass" : "Ducha Pitstop"}</Dado>
-          <Dado rotulo="Plano">{nomePlano ?? "Sem plano"}</Dado>
-          <Dado rotulo="Veículo">{registro.carro}</Dado>
-          <Dado rotulo="Porte">{`${porte.nome} · ${porte.descricao}`}</Dado>
-          <Dado rotulo="Placa">{registro.placa ?? "Não informada"}</Dado>
-          <Dado rotulo="Código">{registro.codigo ?? "-"}</Dado>
-          <Dado rotulo="Data">{formatarDataCurta(registro.dia)}</Dado>
-          <Dado rotulo="Horário">{registro.horario}</Dado>
-          <Dado rotulo={ehAssinatura ? "Benefício do plano" : "Serviço"} largo>
-            {ehAssinatura ? (
-              registro.servicoNome ?? "-"
-            ) : (
-              <>
-                {registro.servicoNome ?? "Ducha Pitstop"}
-                {adicionais.map((a) => (
-                  <span key={a} className="block text-text-secondary">
-                    + {a}
-                  </span>
-                ))}
-              </>
-            )}
-          </Dado>
-          {ehAssinatura && usos.length > 0 && (
-            <Dado rotulo="Uso do benefício" largo>
-              {usos.map((u) => `${u.beneficio}: ${rotuloUsoBeneficio[u.status] ?? u.status}`).join(" · ")}
-            </Dado>
-          )}
-          {!ehAssinatura && registro.preco && (
-            <Dado rotulo="Valor">{formatarPreco(Number(registro.preco))}</Dado>
-          )}
-          {registro.observacoes && (
-            <Dado rotulo="Observações" largo>
-              {registro.observacoes}
-            </Dado>
-          )}
-        </dl>
-      </div>
+            <ClienteBadge nomePlano={nomePlano} />
+          </div>
 
-      {/* Ação da etapa */}
-      <div className="mt-5 space-y-3">
-        {etapa === "aguardando" && (
-          <form action={fazerCheckin.bind(null, registro.id)}>
-            {/* QR identifica o agendamento; a placa confirma o veículo. O check-in só libera com a conferência marcada. */}
-            <div className="mb-3 rounded-lg border-2 border-gold bg-gold/[0.08] p-5">
-              <p className="font-heading text-base font-bold tracking-wide text-gold">
-                {lido === "1" ? "Confirme a placa do veículo" : "Confira o veículo antes do check-in"}
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-wide text-text-secondary">Veículo cadastrado</p>
-                  <p className="mt-1 font-heading text-lg font-bold leading-tight">{registro.carro}</p>
-                </div>
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-wide text-text-secondary">Placa</p>
-                  <p className="mt-1 font-mono text-2xl font-bold tracking-[0.12em] text-white">
-                    {registro.placa ?? "—"}
-                  </p>
-                </div>
-              </div>
-              {!registro.placa && (
-                <p className="mt-3 text-sm text-text-primary">
-                  Placa não informada no agendamento. Confirme o veículo e os dados com o cliente.
-                </p>
+          <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
+            <Dado rotulo="Veículo">{registro.carro}</Dado>
+            <Dado rotulo="Placa">
+              <span className="font-mono">{registro.placa ?? "Não informada"}</span>
+            </Dado>
+            <Dado rotulo="Porte">{porte.nome}</Dado>
+            <Dado rotulo={ehAssinatura ? "Benefício do plano" : "Serviço"} largo>
+              {ehAssinatura ? (
+                (registro.servicoNome ?? "-")
+              ) : (
+                <>
+                  {registro.servicoNome ?? "Ducha Pitstop"}
+                  {adicionais.map((a) => (
+                    <span key={a.nome} className="block font-normal text-adm-muted">
+                      + {a.nome}
+                      {a.preco == null && " (mediante avaliação)"}
+                    </span>
+                  ))}
+                </>
               )}
-              <p className="mt-4 text-xs text-text-secondary">
-                O QR identifica o agendamento. A placa confirma o veículo. Se o veículo ou a placa não baterem,
-                não faça o check-in.
-              </p>
-              <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-md border border-white/15 bg-asphalt px-4 py-3.5 text-sm">
-                <input type="checkbox" name="placaConferida" required className="h-5 w-5 shrink-0 accent-[#e8ab1f]" />
-                Conferi o veículo e a placa
-              </label>
+            </Dado>
+            <Dado rotulo="Plano">{nomePlano ? `PitPass ${nomePlano}` : "Sem plano"}</Dado>
+            {ehAssinatura && usos.length > 0 && (
+              <Dado rotulo="Uso do benefício" largo>
+                {usos.map((u) => `${u.beneficio}: ${rotuloUsoBeneficio[u.status] ?? u.status}`).join(" · ")}
+              </Dado>
+            )}
+            {!ehAssinatura && registro.preco && <Dado rotulo="Valor">{formatarPreco(Number(registro.preco))}</Dado>}
+            {registro.transporte === "leva_busca" && <Dado rotulo="Transporte">Leva & Busca</Dado>}
+            <Dado rotulo="Agendado por">{registro.origem === "admin" ? "Recepção (admin)" : "Site"}</Dado>
+          </dl>
+        </div>
+      </section>
+
+      {cliente?.preferencias && (
+        <section className="rounded-xl bg-[#fdf1cf] px-5 py-4 text-[#5f4300]">
+          <p className="adm-rotulo text-[#7a5600]">Preferências do cliente</p>
+          <p className="mt-1 whitespace-pre-line text-sm font-medium">{cliente.preferencias}</p>
+        </section>
+      )}
+
+      {/* Ação da etapa: só o que é possível agora */}
+      {aguardandoCheckin && (
+        <CheckinPlaca id={registro.id} carro={registro.carro} placa={registro.placa} lido={lido === "1"} />
+      )}
+      {status === "concluido" && (
+        <p className="adm-card px-4 py-3 text-center text-sm font-semibold text-[#1c6a35]">✓ Atendimento concluído</p>
+      )}
+      {status === "cancelado" && (
+        <p className="rounded-xl bg-[#fdecea] px-4 py-3 text-center text-sm font-semibold text-[#b42318]">
+          Agendamento cancelado. O horário foi liberado.
+        </p>
+      )}
+      {status !== "concluido" && status !== "cancelado" && (
+        <AcoesAgendamento
+          id={registro.id}
+          codigo={registro.codigo}
+          status={status}
+          whatsappUrl={whatsappDoCliente(registro)}
+          naFicha
+        />
+      )}
+
+      {/* Operação interna */}
+      <section aria-labelledby="operacao">
+        <h3 id="operacao" className="adm-rotulo mb-3">
+          Operação interna
+        </h3>
+        <FormComAviso
+          action={salvarOperacaoAtendimento.bind(null, registro.id)}
+          mensagem="Dados do atendimento salvos"
+          className="adm-card space-y-5 p-5 sm:p-6"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="adm-rotulo mb-1.5 block">Responsável pelo fechamento</span>
+              <input
+                name="responsavelFechamento"
+                defaultValue={registro.responsavelFechamento ?? ""}
+                placeholder="Quem fechou este agendamento"
+                className="campo"
+              />
+            </label>
+            <label className="block">
+              <span className="adm-rotulo mb-1.5 block">Responsável pelo atendimento</span>
+              <input
+                name="responsavelAtendimento"
+                defaultValue={registro.responsavelAtendimento ?? ""}
+                placeholder="Lavador ou detailer"
+                className="campo"
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="adm-rotulo mb-1.5 block">Observações do atendimento</span>
+            <textarea
+              name="observacoes"
+              rows={3}
+              defaultValue={registro.observacoes ?? ""}
+              placeholder="Ex.: risco já existente na porta direita. Atenção especial às rodas."
+              className="campo"
+            />
+            <span className="mt-1 block text-xs text-adm-muted">
+              Só deste atendimento. Preferências permanentes ficam na ficha do cliente.
+            </span>
+          </label>
+
+          <fieldset>
+            <legend className="adm-rotulo mb-2">Checklist de entrada (opcional)</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {itensChecklist.map((item) => (
+                <label key={item.campo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-black/10 px-3 text-sm">
+                  <input
+                    type="checkbox"
+                    name={item.campo}
+                    defaultChecked={Boolean(checklist[item.chave])}
+                    className="h-[18px] w-[18px] shrink-0 accent-[#16171a]"
+                  />
+                  {item.rotulo}
+                </label>
+              ))}
             </div>
-            <BotaoEtapa>Fazer check-in</BotaoEtapa>
-          </form>
-        )}
-        {etapa === "checkin" && (
-          <form action={iniciarAtendimentoAgendamento.bind(null, registro.id)}>
-            <BotaoEtapa>Iniciar atendimento</BotaoEtapa>
-          </form>
-        )}
-        {etapa === "em_atendimento" && (
-          <form action={atualizarStatusAgendamento.bind(null, registro.id, "concluido")}>
-            <BotaoEtapa>Concluir</BotaoEtapa>
-          </form>
-        )}
-        {etapa === "concluido" && (
-          <p className="rounded-md border border-white/10 bg-panel px-4 py-3 text-center font-mono text-xs uppercase tracking-wide text-text-secondary">
-            ✓ Atendimento concluído
-          </p>
-        )}
-        {etapa === "cancelado" && (
-          <p className="rounded-md border border-red-400/30 bg-red-400/10 px-4 py-3 text-center font-mono text-xs uppercase tracking-wide text-red-300">
-            Agendamento cancelado
-          </p>
-        )}
-      </div>
+          </fieldset>
+
+          <BotaoEnviar>Salvar</BotaoEnviar>
+        </FormComAviso>
+      </section>
 
       {/* Histórico */}
-      <div className="mt-6 rounded-lg border border-white/10 bg-panel p-5">
-        <p className="font-heading text-sm font-bold uppercase tracking-wide">Histórico</p>
-        <ol className="mt-4 space-y-3">
+      <section aria-labelledby="linha-do-tempo">
+        <h3 id="linha-do-tempo" className="adm-rotulo mb-3">
+          Linha do tempo
+        </h3>
+        <ol className="adm-card divide-y divide-adm-line">
           {linhaDoTempo.map((passo) => (
-            <li key={passo.rotulo} className="flex items-baseline gap-4 font-mono text-sm">
-              <span className={`w-28 shrink-0 ${passo.em ? "text-white" : "text-text-secondary/40"}`}>
+            <li key={passo.rotulo} className="flex items-baseline justify-between gap-4 px-5 py-3">
+              <span className={`text-sm font-medium ${passo.em ? "" : "text-black/35"}`}>{passo.rotulo}</span>
+              <span className={`font-mono text-sm tabular-nums ${passo.em ? "" : "text-black/30"}`}>
                 {passo.em
                   ? passo.dia
                     ? `${formatarDataCurta(dataIsoFortaleza(passo.em))} ${formatarHoraFortaleza(passo.em)}`
                     : formatarHoraFortaleza(passo.em)
                   : "--:--"}
               </span>
-              <span
-                className={`text-xs uppercase tracking-wide ${passo.em ? "text-text-primary" : "text-text-secondary/40"}`}
-              >
-                {passo.rotulo}
-              </span>
             </li>
           ))}
         </ol>
-      </div>
+      </section>
 
       {/* Contato + QR */}
-      <div className="mt-6 flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-panel p-5">
+      <section className="adm-card flex items-center justify-between gap-4 p-5">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-wide text-text-secondary">WhatsApp</p>
+          <p className="adm-rotulo">WhatsApp do cliente</p>
           <a
-            href={linkWhatsapp(`Olá ${registro.nome}! Aqui é da PitStop084, sobre seu agendamento ${registro.codigo ?? ""}.`)}
+            href={whatsappDoCliente(registro)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1 block font-mono text-sm text-gold underline-offset-4 hover:underline"
+            className="mt-1 block font-mono text-sm font-semibold underline underline-offset-4"
           >
             {registro.telefone}
           </a>
-          <p className="mt-3 text-xs text-text-secondary">QR do PitPass deste atendimento.</p>
+          <p className="mt-3 text-xs text-adm-muted">QR original do PitPass deste agendamento (o mesmo do cliente).</p>
         </div>
-        <QrCode conteudo={urlCheckin(origem, token)} className="h-24 w-24 shrink-0 rounded-md" />
-      </div>
-
-      {registro.status === "confirmado" && (
-        <form action={atualizarStatusAgendamento.bind(null, registro.id, "cancelado")} className="mt-6 text-center">
-          <button
-            type="submit"
-            className="font-mono text-xs uppercase tracking-wide text-text-secondary underline-offset-4 hover:text-red-400 hover:underline"
-          >
-            Cancelar agendamento
-          </button>
-        </form>
-      )}
+        <QrCode conteudo={urlCheckin(origem, token)} className="h-24 w-24 shrink-0 rounded-md border border-black/10" />
+      </section>
     </div>
   );
 }
 
 function Dado({ rotulo, largo, children }: { rotulo: string; largo?: boolean; children: ReactNode }) {
   return (
-    <div className={largo ? "col-span-2" : undefined}>
-      <dt className="font-mono text-[10px] uppercase tracking-wide text-text-secondary">{rotulo}</dt>
-      <dd className="mt-0.5 text-text-primary">{children}</dd>
+    <div className={`min-w-0 ${largo ? "col-span-2 sm:col-span-3" : ""}`}>
+      <dt className="adm-rotulo">{rotulo}</dt>
+      <dd className="mt-1 break-words text-sm font-medium">{children}</dd>
     </div>
-  );
-}
-
-function BotaoEtapa({ children }: { children: ReactNode }) {
-  return (
-    <button
-      type="submit"
-      className="w-full rounded-md bg-gold py-4 font-heading text-base font-bold tracking-wide text-asphalt transition hover:brightness-110"
-    >
-      {children}
-    </button>
   );
 }

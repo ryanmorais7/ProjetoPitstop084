@@ -20,13 +20,22 @@ export async function buscarClientePorTelefone(telefone: string) {
   return cliente ?? null;
 }
 
-export async function buscarOuCriarCliente({ nome, telefone }: { nome: string; telefone: string }) {
+export async function buscarOuCriarCliente({
+  nome,
+  telefone,
+  origem,
+}: {
+  nome: string;
+  telefone: string;
+  /** Só é gravada quando o cliente é criado agora; nunca sobrescreve a origem de quem já existe. */
+  origem?: string | null;
+}) {
   const existente = await buscarClientePorTelefone(telefone);
   if (existente) return { cliente: existente, criado: false };
 
   const [novo] = await db
     .insert(clientes)
-    .values({ nome: nome.trim(), telefone: telefone.trim() })
+    .values({ nome: nome.trim(), telefone: telefone.trim(), origem: origem ?? null })
     .returning();
   const codigo = `C084-${String(novo.id).padStart(4, "0")}`;
   const [atualizado] = await db
@@ -134,7 +143,11 @@ export interface ResumoBeneficio {
   beneficio: string;
   tipo: "ciclo" | "semanal";
   limite: number | null;
+  /** reservados + utilizados (o que conta na cota). */
   usados: number;
+  /** Agendado e ainda não concluído. Cancelar devolve; concluir consome. */
+  reservados: number;
+  utilizados: number;
 }
 
 /** Resumo real (não decorativo) do uso de cada benefício de uma assinatura, pro ciclo/semana vigente. */
@@ -160,7 +173,15 @@ export async function resumoBeneficiosAssinatura(
           ne(beneficioUsos.status, "liberado")
         )
       );
-    resumo.push({ beneficio, tipo: regra.tipo, limite: regra.limite, usados: usos.length });
+    const utilizados = usos.filter((u) => u.status === "utilizado").length;
+    resumo.push({
+      beneficio,
+      tipo: regra.tipo,
+      limite: regra.limite,
+      usados: usos.length,
+      reservados: usos.length - utilizados,
+      utilizados,
+    });
   }
   return resumo;
 }
@@ -195,6 +216,7 @@ export interface DadosNovoAgendamento {
   enderecoSnapshot?: string | null;
   observacoes?: string | null;
   origem: "landing" | "admin";
+  responsavelFechamento?: string | null;
   /** Se for uso de benefício PitPass, a assinatura ativa correspondente. */
   assinaturaId?: number | null;
 }
@@ -211,7 +233,11 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
     return { ok: false, erro: "Data inválida.", status: 400 };
   }
 
-  const { cliente } = await buscarOuCriarCliente({ nome: dados.nome, telefone: dados.telefone });
+  const { cliente } = await buscarOuCriarCliente({
+    nome: dados.nome,
+    telefone: dados.telefone,
+    origem: dados.origem === "landing" ? "site" : null,
+  });
   const veiculo = await buscarOuCriarVeiculo({
     clienteId: cliente.id,
     modelo: dados.carro,
@@ -244,6 +270,7 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
         enderecoSnapshot: dados.enderecoSnapshot ?? null,
         observacoes: dados.observacoes ?? null,
         origem: dados.origem,
+        responsavelFechamento: dados.responsavelFechamento ?? null,
         dia: dados.dia,
         horario: dados.horario,
         checkinToken,

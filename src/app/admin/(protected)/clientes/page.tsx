@@ -1,88 +1,67 @@
 import Link from "next/link";
-import { buscarClientes } from "@/lib/clientes";
-import { assinaturas } from "@/db/schema";
-import { db } from "@/db/client";
-import { eq } from "drizzle-orm";
-import { planos, PlanoId } from "@/lib/data";
-import ClienteBadge from "@/components/admin/ClienteBadge";
+import { listarClientesResumo } from "@/lib/adminDados";
+import ClienteLinha from "@/components/admin/ClienteLinha";
 
-export default async function ClientesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
-  const { q } = await searchParams;
-  const termo = q?.trim() ?? "";
-  const resultados = termo ? await buscarClientes(termo) : [];
-
-  const assinaturasAtivas =
-    resultados.length > 0
-      ? await db.select().from(assinaturas).where(eq(assinaturas.status, "ativo"))
-      : [];
-  const assinaturaPorCliente = new Map(assinaturasAtivas.map((a) => [a.clienteId, a]));
+export default async function ClientesPage({ searchParams }: PageProps<"/admin/clientes">) {
+  const params = await searchParams;
+  const termo = typeof params.q === "string" ? params.q.trim() : "";
+  const clientes = await listarClientesResumo(termo);
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-heading text-2xl font-bold">Clientes</h1>
-        <Link
-          href="/admin/clientes/novo"
-          className="rounded-sm bg-gold px-4 py-2 font-heading text-xs font-semibold uppercase tracking-wide text-asphalt transition hover:brightness-110"
-        >
+      <div className="flex flex-wrap gap-2">
+        <form method="GET" action="/admin/clientes" role="search" className="flex min-w-0 flex-1 gap-2">
+          <label htmlFor="busca-clientes" className="sr-only">
+            Buscar clientes
+          </label>
+          <input
+            id="busca-clientes"
+            type="search"
+            name="q"
+            defaultValue={termo}
+            placeholder="Buscar por nome, código, WhatsApp ou placa"
+            className="campo"
+          />
+          <button type="submit" className="adm-btn shrink-0">
+            Buscar
+          </button>
+        </form>
+        <Link href="/admin/clientes/novo" className="adm-btn adm-btn-primario">
           + Novo cliente
         </Link>
       </div>
 
-      <form method="GET" action="/admin/clientes" className="flex gap-2">
-        <input
-          type="text"
-          name="q"
-          defaultValue={termo}
-          placeholder="Buscar por nome, código, WhatsApp ou placa..."
-          autoFocus
-          className="campo"
-        />
-        <button
-          type="submit"
-          className="shrink-0 rounded-sm bg-gold px-5 py-2.5 font-heading text-sm font-semibold text-asphalt transition hover:brightness-110"
-        >
-          Buscar
-        </button>
-      </form>
+      <p className="adm-rotulo mt-6">
+        {termo
+          ? `${clientes.length} resultado${clientes.length === 1 ? "" : "s"} para “${termo}”`
+          : `Clientes mais recentes · ${clientes.length}`}
+      </p>
 
-      {termo && resultados.length === 0 && (
-        <div className="mt-6 rounded-sm border border-white/10 bg-panel p-6 text-center">
-          <p className="text-sm text-text-secondary">Nenhum cliente encontrado para &quot;{termo}&quot;.</p>
-          <Link
-            href="/admin/clientes/novo"
-            className="mt-3 inline-block font-mono text-xs uppercase tracking-wide text-gold underline-offset-4 hover:underline"
-          >
-            Cadastrar novo cliente
+      {clientes.length === 0 ? (
+        <div className="mt-3 rounded-xl border border-dashed border-black/15 px-5 py-12 text-center">
+          <p className="font-heading text-lg font-bold">Nenhum cliente encontrado.</p>
+          <p className="mt-1 text-sm text-adm-muted">
+            {termo ? "Confira o termo ou cadastre um novo cliente." : "Os clientes aparecem aqui depois do primeiro agendamento."}
+          </p>
+          <Link href="/admin/clientes/novo" className="adm-btn mt-5">
+            Cadastrar cliente
           </Link>
         </div>
+      ) : (
+        <div className="adm-card mt-3 overflow-hidden">
+          <div className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-x-4 border-b border-adm-line bg-black/[0.02] px-5 py-2.5 md:grid">
+            <span className="adm-rotulo">Nome e tipo</span>
+            <span className="adm-rotulo">Veículo e placa</span>
+            <span className="adm-rotulo">Última visita</span>
+            <span className="adm-rotulo">Próximo atendimento</span>
+          </div>
+          <div className="divide-y divide-adm-line">
+            {clientes.map((c) => (
+              <ClienteLinha key={c.id} cliente={c} />
+            ))}
+          </div>
+        </div>
       )}
-
-      <div className="mt-6 space-y-2">
-        {resultados.map((cliente) => {
-          const assinatura = assinaturaPorCliente.get(cliente.id);
-          const nomePlano = assinatura ? planos[assinatura.plano as PlanoId]?.nome : null;
-          return (
-            <Link
-              key={cliente.id}
-              href={`/admin/clientes/${cliente.id}`}
-              className="flex items-center justify-between gap-4 rounded-sm border border-white/10 bg-panel p-4 transition hover:border-gold"
-            >
-              <div>
-                <p className="font-heading text-base font-bold">{cliente.nome}</p>
-                <p className="font-mono text-xs text-text-secondary">
-                  {cliente.codigo} · {cliente.telefone}
-                </p>
-              </div>
-              <ClienteBadge nomePlano={nomePlano} className="shrink-0" />
-            </Link>
-          );
-        })}
-      </div>
     </div>
   );
 }
