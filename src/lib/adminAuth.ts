@@ -6,6 +6,12 @@ import { redirect } from "next/navigation";
  * Usa apenas Web Crypto (crypto.subtle) para assinar/verificar o cookie.
  */
 
+/**
+ * TEMPORÁRIO: com `true`, o /admin abre sem senha pra qualquer pessoa que tenha o link
+ * (proxy, páginas e Server Actions passam direto). Voltar pra `false` religa o login.
+ */
+export const ADMIN_SEM_SENHA = true;
+
 export const COOKIE_SESSAO = "pitstop_admin_sessao";
 const DURACAO_SESSAO_MS = 1000 * 60 * 60 * 24 * 7; // 7 dias
 
@@ -69,6 +75,7 @@ export async function exigirSessaoAdmin(): Promise<void> {
 }
 
 export async function tokenValido(token: string | undefined | null): Promise<boolean> {
+  if (ADMIN_SEM_SENHA) return true;
   if (!token) return false;
   const [expiraStr, assinaturaHex] = token.split(".");
   if (!expiraStr || !assinaturaHex) return false;

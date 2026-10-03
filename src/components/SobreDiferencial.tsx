@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
 
@@ -36,14 +37,15 @@ export default function SobreDiferencial() {
 
         <Reveal delayMs={100}>
           <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm">
-            {/* Substituir por <Image> com foto real do carro/detalhamento quando disponível */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(160deg, #0a0a0b 0%, #17181b 60%, #0a0a0b 100%)",
-              }}
+            <Image
+              src="/vitrificacao-pitstop084.jpg"
+              alt="Aplicação de vitrificador em um aplicador de microfibra, com o carro ao fundo"
+              fill
+              sizes="(min-width: 768px) 40vw, 100vw"
+              className="object-cover"
             />
+            {/* escurece a base pra frase continuar legível sobre a foto */}
+            <div className="absolute inset-0 bg-gradient-to-t from-asphalt/90 via-asphalt/20 to-transparent" />
             <p className="absolute bottom-6 left-6 right-6 font-heading text-lg font-bold text-white">
               Cuidar de um carro é mais do que limpar. É preservar cada detalhe.
             </p>
