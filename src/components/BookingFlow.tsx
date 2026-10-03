@@ -7,9 +7,7 @@ import {
   listaPlanos,
   PlanoId,
   servicosPorPlano,
-  beneficiosAgendaveis,
-  itensInclusosBeneficio,
-  idealParaBeneficio,
+  lavagensPlano,
   regrasBeneficios,
   formatarRegraBeneficio,
   portesVeiculo,
@@ -28,6 +26,8 @@ import DateTimePicker from "./DateTimePicker";
 import PitPass from "./PitPass";
 import Bolt from "./Bolt";
 import { VehicleSizeSelector } from "./VehicleSizeSelector";
+import FichaTecnicaSheet from "./FichaTecnicaSheet";
+import NivelCuidado from "./NivelCuidado";
 import { abrirMeuPitPass, lembrarBuscaPitPass } from "./MeuPitPass";
 
 type Etapa = "tipo" | "plano" | "veiculo" | "beneficio" | "horario" | "ficha" | "confirmacao";
@@ -118,6 +118,9 @@ export default function BookingFlow() {
   }, [tipoAtendimento, planoSelecionado, beneficioSelecionado, porteDefinidoPeloUsuario]);
 
   const plano = planoSelecionado ? planos[planoSelecionado] : null;
+  const fichaBeneficio = detalheBeneficio ? (lavagensPlano[detalheBeneficio] ?? null) : null;
+  const regraFichaBeneficio =
+    plano && detalheBeneficio ? regrasBeneficios[plano.id][detalheBeneficio] : null;
   const porte = portesVeiculo[porteVeiculo];
   const precoDucha = precoServico(duchaPitstop, porteVeiculo) ?? 0;
   const adicionaisComPreco = avulsosSelecionados.filter((s) => s.precos);
@@ -391,8 +394,7 @@ export default function BookingFlow() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {servicosPorPlano[plano.id].map((nome) => {
                   const regra = regrasBeneficios[plano.id][nome];
-                  const aberto = detalheBeneficio === nome;
-                  const temDetalhes = Boolean(idealParaBeneficio[nome]) || itensInclusosBeneficio[nome]?.length > 0;
+                  const lavagem = lavagensPlano[nome];
                   return (
                     <div
                       key={nome}
@@ -411,49 +413,24 @@ export default function BookingFlow() {
                             </span>
                           )}
                         </div>
-                        {beneficiosAgendaveis[nome] && (
-                          <p className="mt-1 text-sm text-text-secondary">{beneficiosAgendaveis[nome]}</p>
+                        {lavagem?.shortDescription && (
+                          <p className="mt-1.5 line-clamp-3 text-sm text-text-secondary">{lavagem.shortDescription}</p>
                         )}
-                        <span className="mt-3 font-mono text-[11px] uppercase tracking-widest text-gold">
+                        {lavagem?.nivel && <NivelCuidado nivel={lavagem.nivel} className="mt-3" />}
+                        <span className="mt-4 font-mono text-[11px] uppercase tracking-widest text-gold">
                           Usar este benefício →
                         </span>
                       </button>
 
-                      {temDetalhes && (
-                        <>
-                          <div className="colapsavel" data-aberto={aberto} inert={!aberto}>
-                            <div>
-                              <div className="space-y-3 px-4 pb-1 sm:px-5">
-                                {idealParaBeneficio[nome] && (
-                                  <div>
-                                    <p className="font-mono text-[10px] uppercase tracking-wide text-gold">
-                                      Ideal para
-                                    </p>
-                                    <p className="mt-0.5 text-xs text-text-secondary">{idealParaBeneficio[nome]}</p>
-                                  </div>
-                                )}
-                                {itensInclusosBeneficio[nome]?.length > 0 && (
-                                  <div>
-                                    <p className="font-mono text-[10px] uppercase tracking-wide text-gold">Inclui</p>
-                                    <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
-                                      {itensInclusosBeneficio[nome].map((item) => (
-                                        <li key={item}>• {item}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setDetalheBeneficio(aberto ? null : nome)}
-                            aria-expanded={aberto}
-                            className="border-t border-white/5 px-4 py-2.5 text-left font-mono text-[10px] uppercase tracking-widest text-text-secondary transition-colors hover:text-gold sm:px-5"
-                          >
-                            {aberto ? "Mostrar menos ↑" : "Ver detalhes +"}
-                          </button>
-                        </>
+                      {lavagem && (
+                        <button
+                          type="button"
+                          onClick={() => setDetalheBeneficio(nome)}
+                          aria-haspopup="dialog"
+                          className="mt-auto border-t border-white/[0.07] px-4 py-3.5 text-left font-mono text-[10px] uppercase tracking-widest text-text-secondary transition-colors hover:text-gold sm:px-5"
+                        >
+                          Ver o que inclui
+                        </button>
                       )}
                     </div>
                   );
@@ -809,6 +786,42 @@ export default function BookingFlow() {
           )}
           </div>
         </div>
+
+        {/* ficha técnica do benefício: o assinante relembra a diferença antes de agendar */}
+        <FichaTecnicaSheet
+          ficha={fichaBeneficio}
+          etiqueta={plano ? `Plano ${plano.nome}` : undefined}
+          nivel={fichaBeneficio?.nivel}
+          tituloInclui="O que inclui"
+          incluiTudoDe={fichaBeneficio?.incluiTudoDe}
+          diferencial={fichaBeneficio?.diferencial}
+          valor={
+            regraFichaBeneficio && (
+              <>
+                <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-secondary">
+                  No seu plano
+                </span>
+                <span className="font-heading text-sm font-bold tracking-[0.14em] text-gold">
+                  {formatarRegraBeneficio(regraFichaBeneficio)}
+                </span>
+              </>
+            )
+          }
+          acao={
+            <button
+              type="button"
+              onClick={() => {
+                if (!detalheBeneficio) return;
+                setDetalheBeneficio(null);
+                escolherBeneficio(detalheBeneficio);
+              }}
+              className="w-full rounded-sm bg-gold py-4 font-heading text-sm font-bold tracking-[0.12em] text-asphalt transition hover:brightness-110"
+            >
+              Usar este benefício
+            </button>
+          }
+          onFechar={() => setDetalheBeneficio(null)}
+        />
 
         {etapa !== "confirmacao" && (
           <div className="mt-5 flex flex-col gap-3 rounded-sm border border-black/10 bg-light-panel/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

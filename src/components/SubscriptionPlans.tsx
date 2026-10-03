@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { listaPlanos, regraUtilizacaoPlanos, PlanoId } from "@/lib/data";
+import {
+  listaPlanos,
+  planos,
+  regraUtilizacaoPlanos,
+  PlanoId,
+  servicosPorPlano,
+  lavagensPlano,
+  regrasBeneficios,
+  formatarRegraBeneficio,
+} from "@/lib/data";
 import { scrollToId } from "@/lib/scroll";
 import { useSelection } from "@/context/SelectionContext";
 import { VehicleSizeSelector } from "./VehicleSizeSelector";
@@ -9,11 +18,17 @@ import PlanoCard from "./PlanoCard";
 import PlanFinder from "./PlanFinder";
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
+import FichaTecnicaSheet from "./FichaTecnicaSheet";
 
 export default function SubscriptionPlans() {
   const { porteVeiculo, selecionarPlano, setTipoAtendimento } = useSelection();
   // versão muda a cada recomendação pra o realce rodar de novo mesmo se o plano for o mesmo
   const [destaque, setDestaque] = useState<{ id: PlanoId; versao: number } | null>(null);
+  // ficha técnica aberta: qual lavagem, de qual plano
+  const [fichaAberta, setFichaAberta] = useState<{ planoId: PlanoId; lavagem: string } | null>(null);
+  const lavagemAberta = fichaAberta ? lavagensPlano[fichaAberta.lavagem] : null;
+  const planoDaFicha = fichaAberta ? planos[fichaAberta.planoId] : null;
+  const regraDaFicha = fichaAberta ? regrasBeneficios[fichaAberta.planoId][fichaAberta.lavagem] : null;
 
   function assinar(id: PlanoId) {
     selecionarPlano(id);
@@ -69,6 +84,7 @@ export default function SubscriptionPlans() {
                   porteVeiculo={porteVeiculo}
                   destacado={destacado}
                   onClick={() => assinar(plano.id)}
+                  onVerInclui={() => setFichaAberta({ planoId: plano.id, lavagem: servicosPorPlano[plano.id][0] })}
                 />
               </Reveal>
             );
@@ -81,6 +97,51 @@ export default function SubscriptionPlans() {
           </p>
         </Reveal>
       </div>
+
+      <FichaTecnicaSheet
+        ficha={lavagemAberta}
+        etiqueta={planoDaFicha ? `Plano ${planoDaFicha.nome}` : undefined}
+        nivel={lavagemAberta?.nivel}
+        tituloInclui="O que inclui"
+        incluiTudoDe={lavagemAberta?.incluiTudoDe}
+        diferencial={lavagemAberta?.diferencial}
+        abas={
+          fichaAberta
+            ? servicosPorPlano[fichaAberta.planoId].map((lavagem) => ({
+                rotulo: lavagem,
+                ativa: lavagem === fichaAberta.lavagem,
+                onClick: () => setFichaAberta({ planoId: fichaAberta.planoId, lavagem }),
+              }))
+            : undefined
+        }
+        valor={
+          regraDaFicha && (
+            <>
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-secondary">
+                No seu plano
+              </span>
+              <span className="font-heading text-sm font-bold tracking-[0.14em] text-gold">
+                {formatarRegraBeneficio(regraDaFicha)}
+              </span>
+            </>
+          )
+        }
+        acao={
+          planoDaFicha && (
+            <button
+              type="button"
+              onClick={() => {
+                setFichaAberta(null);
+                assinar(planoDaFicha.id);
+              }}
+              className="w-full rounded-sm bg-gold py-4 font-heading text-sm font-bold tracking-[0.12em] text-asphalt transition hover:brightness-110"
+            >
+              {planoDaFicha.cta}
+            </button>
+          )
+        }
+        onFechar={() => setFichaAberta(null)}
+      />
     </section>
   );
 }

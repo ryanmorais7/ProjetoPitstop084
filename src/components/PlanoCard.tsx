@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Plano, VehicleSize } from "@/lib/data";
-import { formatarPrecoPartes } from "@/lib/format";
 import Bolt from "./Bolt";
+import NivelCuidado from "./NivelCuidado";
+import Preco from "./Preco";
 
 const estilosPorPlano: Record<
   Plano["id"],
@@ -39,18 +40,20 @@ export default function PlanoCard({
   plano,
   porteVeiculo,
   onClick,
+  onVerInclui,
   destacado = false,
 }: {
   plano: Plano;
   porteVeiculo: VehicleSize;
   onClick?: () => void;
+  /** Abre a ficha técnica das lavagens do plano. */
+  onVerInclui?: () => void;
   /** Plano recomendado pelo assistente: recebe um realce curto, sem esconder os outros. */
   destacado?: boolean;
 }) {
   const [verTodos, setVerTodos] = useState(false);
   const estilo = estilosPorPlano[plano.id];
   const preco = plano.precos[porteVeiculo];
-  const { moeda, valor } = formatarPrecoPartes(preco);
   const textoSecundario = plano.id === "diamante" ? "text-light-text-secondary" : "text-text-secondary";
   const ocultos = plano.beneficios.length - BENEFICIOS_VISIVEIS_MOBILE;
 
@@ -74,20 +77,17 @@ export default function PlanoCard({
         </div>
       )}
       <h3 className={`font-heading text-2xl font-bold ${estilo.nome}`}>{plano.nome}</h3>
+      <NivelCuidado nivel={plano.nivel} claro={plano.id === "diamante"} className="mt-3" />
 
-      <p className={`mt-3 flex flex-wrap items-baseline gap-x-1 font-mono font-bold ${estilo.preco}`}>
-        <span className="text-sm font-semibold">{moeda}</span>
-        <span
-          key={porteVeiculo}
-          className="valor-atualiza text-[clamp(1.5rem,4.5vw,1.875rem)] leading-none"
-        >
-          {valor}
+      <p className={`mt-6 flex flex-wrap items-baseline gap-x-1.5 ${estilo.preco}`}>
+        <span key={porteVeiculo} className="valor-atualiza">
+          <Preco valor={preco} className="text-4xl" />
         </span>
-        <span className={`whitespace-nowrap text-sm font-normal ${textoSecundario}`}>/mês</span>
+        <span className={`whitespace-nowrap font-mono text-xs ${textoSecundario}`}>/mês</span>
       </p>
-      <p className={`mt-3 text-sm ${textoSecundario}`}>{plano.headline}</p>
+      <p className={`mt-4 text-sm leading-relaxed ${textoSecundario}`}>{plano.headline}</p>
 
-      <ul className="mt-5 space-y-2.5 text-sm">
+      <ul className="mt-6 space-y-2.5 text-sm">
         {plano.beneficios.map((item, i) => (
           <li
             key={item}
@@ -112,10 +112,26 @@ export default function PlanoCard({
       )}
       <div className="mb-8" />
 
+      {onVerInclui && (
+        <button
+          type="button"
+          onClick={onVerInclui}
+          aria-haspopup="dialog"
+          className={`mb-3 mt-auto rounded-sm border py-3 font-mono text-[11px] uppercase tracking-widest transition-colors duration-200 ${
+            plano.id === "diamante"
+              ? "border-black/15 text-light-text hover:border-black/40"
+              : "border-white/15 text-text-primary hover:border-gold hover:text-gold"
+          }`}
+        >
+          Ver o que inclui
+        </button>
+      )}
       <button
         type="button"
         onClick={onClick}
-        className={`mt-auto flex items-center justify-center gap-1 rounded-sm py-3 font-heading text-xs font-bold uppercase tracking-wide transition ${estilo.cta}`}
+        className={`flex items-center justify-center gap-1 rounded-sm py-3.5 font-heading text-xs font-bold uppercase tracking-[0.12em] transition ${
+          onVerInclui ? "" : "mt-auto"
+        } ${estilo.cta}`}
       >
         {plano.cta}
       </button>

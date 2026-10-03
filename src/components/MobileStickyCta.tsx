@@ -69,7 +69,7 @@ export default function MobileStickyCta() {
               <div key={s.id} className="mt-1 flex justify-between text-text-secondary">
                 <span>+ {s.nome}</span>
                 <span className="text-white">
-                  {preco != null ? formatarPreco(preco) : "Mediante avaliação"}
+                  {preco != null ? formatarPreco(preco) : "Avaliação solicitada"}
                 </span>
               </div>
             );

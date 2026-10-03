@@ -8,7 +8,7 @@ import {
   listaPlanos,
   planos,
   servicosPorPlano,
-  beneficiosAgendaveis,
+  lavagensPlano,
   PlanoId,
   VehicleSize,
 } from "@/lib/data";
@@ -218,8 +218,8 @@ export default function NovoAtendimentoForm({
                 </option>
               ))}
             </select>
-            {servicoPlano && beneficiosAgendaveis[servicoPlano] && (
-              <p className="mt-1 text-xs text-text-secondary">{beneficiosAgendaveis[servicoPlano]}</p>
+            {servicoPlano && lavagensPlano[servicoPlano]?.shortDescription && (
+              <p className="mt-1 text-xs text-text-secondary">{lavagensPlano[servicoPlano].shortDescription}</p>
             )}
           </label>
           {precoAssinatura != null && !assinaturaAtiva && (

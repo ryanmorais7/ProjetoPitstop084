@@ -322,6 +322,64 @@ body {
   animation: folha-entra 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+/* Ficha técnica: sobe como folha no mobile, entra como gaveta lateral no desktop. */
+@keyframes gaveta-entra {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.ficha-entra {
+  animation: folha-entra 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (min-width: 768px) {
+  .ficha-entra {
+    animation-name: gaveta-entra;
+  }
+}
+
+/* Preço: algarismos da fonte de título, tabulares, com a moeda menor e mais leve. */
+.preco {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.preco-moeda {
+  margin-right: 0.3em;
+  font-size: 0.5em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
+/* Transição entre o hero e a seção seguinte: fade preto → grafite, luz central e fio dourado. */
+.transicao-secao {
+  position: relative;
+  height: clamp(7rem, 16vw, 11rem);
+  overflow: hidden;
+  background:
+    radial-gradient(60% 120% at 50% 100%, rgba(232, 171, 31, 0.07), transparent 70%),
+    linear-gradient(180deg, var(--color-asphalt) 0%, #0d0e10 45%, #15161a 100%);
+}
+
+.transicao-fio {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(232, 171, 31, 0.7) 55%, rgba(232, 171, 31, 0.15));
+}
+
 .pitpass-filete {
   height: 3px;
   background: var(--pp-filete);

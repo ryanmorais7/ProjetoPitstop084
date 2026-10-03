@@ -16,9 +16,20 @@ export const listaPortesVeiculo: VehicleSizeInfo[] = Object.values(portesVeiculo
 
 export type PlanoId = "black" | "gold" | "diamante";
 
+/** Nível de cuidado: 1 = limpar, 2 = limpar + proteger, 3 = limpar + proteger + preservar. */
+export type NivelCuidado = 1 | 2 | 3;
+
+/** Pilares acumulados por nível (o nível N entrega os N primeiros). */
+export const pilaresCuidado = ["Limpar", "Proteger", "Preservar"] as const;
+
+export function pilaresDoNivel(nivel: NivelCuidado): string {
+  return pilaresCuidado.slice(0, nivel).join(" + ");
+}
+
 export interface Plano {
   id: PlanoId;
   nome: string;
+  nivel: NivelCuidado;
   headline: string;
   precos: Record<VehicleSize, number>;
   beneficios: string[];
@@ -37,7 +48,8 @@ export const planos: Record<PlanoId, Plano> = {
   black: {
     id: "black",
     nome: "Black",
-    headline: "Seu carro limpo. Sua rotina mais prática.",
+    nivel: 1,
+    headline: "Manutenção essencial para manter seu carro limpo e apresentável.",
     precos: { P: 149.9, G: 199.9 },
     beneficios: [
       "1 lavagem semanal",
@@ -50,7 +62,8 @@ export const planos: Record<PlanoId, Plano> = {
   gold: {
     id: "gold",
     nome: "Gold",
-    headline: "Cuidado premium, praticidade e exclusividade para o seu carro.",
+    nivel: 2,
+    headline: "Limpeza e proteção adicional para conservar pintura, plásticos e acabamento.",
     precos: { P: 239.9, G: 269.9 },
     beneficios: [
       "1 Lavagem Gold mensal",
@@ -64,8 +77,9 @@ export const planos: Record<PlanoId, Plano> = {
   diamante: {
     id: "diamante",
     nome: "Diamante",
+    nivel: 3,
     headline:
-      "O cuidado mais completo da PitStop084 para quem não abre mão de ter o carro sempre impecável.",
+      "O tratamento mais completo da PitStop084 para quem busca conservação, acabamento e preservação superior.",
     precos: { P: 329.9, G: 389.9 },
     beneficios: [
       "1 Lavagem Diamante mensal",
@@ -107,14 +121,6 @@ export const regrasBeneficios: Record<
   },
 };
 
-/**
- * Itens detalhados de "o que inclui" cada lavagem/benefício, pra mostrar no card da etapa
- * "o que você quer usar?". Não existe conteúdo comercial definido pra isso ainda — fica vazio
- * de propósito (a UI só mostra o bloco "Inclui" quando a lista não estiver vazia) até vir o
- * texto real.
- */
-export const itensInclusosBeneficio: Record<string, string[]> = {};
-
 export type CategoriaCuidado = "limpeza" | "protecao" | "estetica";
 
 export const categoriasCuidado: Record<CategoriaCuidado, string> = {
@@ -123,16 +129,31 @@ export const categoriasCuidado: Record<CategoriaCuidado, string> = {
   estetica: "Estética avançada",
 };
 
-export interface Servico {
+/**
+ * Ficha técnica: estrutura única usada por serviços avulsos e lavagens dos planos.
+ * É a fonte de verdade de landing, configurador, agendamento, "Sou assinante" e admin —
+ * objeto serializável, pronto pra vir do banco quando o admin passar a editar.
+ */
+export interface FichaTecnica {
   id: string;
   nome: string;
-  descricao?: string;
-  /** Descrição curta (uma linha), usada nos cards do configurador "Monte seu Pitstop". */
+  /** Uma ou duas linhas: é o que aparece no card. O resto só na ficha. */
   shortDescription?: string;
+  idealFor?: string[];
+  includes?: string[];
+  expectedResult?: string;
+  /** Limitações e avisos ("Importante") que evitam promessa errada. */
+  technicalNote?: string;
+  /**
+   * Pontos que a operação ainda precisa confirmar. NUNCA aparece no site:
+   * é a lista de pendências desta ficha.
+   */
+  aConfirmar?: string[];
+}
+
+export interface Servico extends FichaTecnica {
   categoria?: CategoriaCuidado;
-  itens?: string[];
   duracao?: string;
-  resultado?: string;
   /** null = serviço mediante avaliação, sem preço fixo */
   precos: Record<VehicleSize, number> | null;
   requiresEvaluation: boolean;
@@ -143,18 +164,21 @@ export function precoServico(servico: Servico, porte: VehicleSize): number | nul
   return servico.precos ? servico.precos[porte] : null;
 }
 
+const notaAvaliacao = "O valor é definido após avaliação presencial do veículo.";
+
 export const duchaPitstop: Servico = {
   id: "ducha-pitstop",
   nome: "Ducha Pitstop",
-  descricao: "Uma limpeza rápida para manter o veículo sempre limpo e apresentável.",
-  itens: [
+  shortDescription: "Lavagem rápida para manter o carro limpo, seco e apresentável.",
+  includes: [
     "Lavagem externa completa",
-    "Secagem detalhada de toda a carroceria",
-    "Secagem das caixas de portas",
-    "Aplicação de pretinho nos pneus",
+    "Rodas e pneus",
+    "Caixas de portas",
+    "Secagem detalhada",
+    "Pretinho nos pneus",
   ],
   duracao: "Aproximadamente 45 minutos",
-  resultado: "Veículo limpo, seco e com pneus renovados.",
+  expectedResult: "Veículo limpo, seco e com pneus renovados.",
   precos: { P: 49.9, G: 49.9 },
   requiresEvaluation: false,
 };
@@ -164,8 +188,17 @@ export const servicosAvulsos: Servico[] = [
   {
     id: "descontaminacao-pintura",
     nome: "Descontaminação de Pintura",
-    shortDescription: "Remove contaminantes aderidos à superfície.",
+    shortDescription: "Remove contaminantes aderidos e prepara a pintura para receber proteção.",
     categoria: "limpeza",
+    idealFor: ["Pintura áspera ao toque, contaminada ou com resíduos aderidos"],
+    includes: [
+      "Limpeza e preparação da superfície",
+      "Remoção de contaminantes aderidos",
+      "Descontaminação química e/ou mecânica, conforme a necessidade",
+      "Preparação para proteção ou acabamento posterior",
+    ],
+    expectedResult: "Superfície mais limpa, lisa e preparada para receber proteção.",
+    aConfirmar: ["Método usado (químico, mecânico ou ambos) e produtos"],
     precos: { P: 99.9, G: 149.9 },
     requiresEvaluation: false,
     destaque: true,
@@ -173,8 +206,27 @@ export const servicosAvulsos: Servico[] = [
   {
     id: "higienizacao-interna",
     nome: "Higienização Interna",
-    shortDescription: "Limpeza profunda para renovar o interior.",
+    shortDescription: "Limpeza profunda e higienização das principais superfícies internas.",
     categoria: "limpeza",
+    idealFor: [
+      "Veículos com uso intenso",
+      "Crianças ou pets",
+      "Sujeira acumulada",
+      "Manchas",
+      "Interior há muito tempo sem higienização",
+    ],
+    includes: [
+      "Limpeza dos bancos e estofados",
+      "Limpeza do carpete",
+      "Limpeza do teto",
+      "Limpeza dos cintos",
+      "Painel e console",
+      "Portas e acabamentos",
+      "Higienização das superfícies compatíveis",
+    ],
+    expectedResult: "Interior mais limpo, renovado e higienizado.",
+    technicalNote: "Manchas permanentes podem não ser removidas por completo.",
+    aConfirmar: ["Produtos de higienização utilizados"],
     precos: { P: 249.9, G: 299.9 },
     requiresEvaluation: false,
     destaque: true,
@@ -182,8 +234,12 @@ export const servicosAvulsos: Servico[] = [
   {
     id: "protecao-pintura-selante",
     nome: "Proteção de Pintura c/ Selante",
-    shortDescription: "Proteção e acabamento para a pintura.",
+    shortDescription: "Selante aplicado sobre a pintura para mais brilho e proteção.",
     categoria: "protecao",
+    idealFor: ["Quem quer aumentar o brilho e a proteção da pintura"],
+    includes: ["Preparação da superfície", "Aplicação do selante", "Acabamento", "Proteção da pintura"],
+    expectedResult: "Mais brilho, repelência e proteção contra agentes externos.",
+    aConfirmar: ["Selante utilizado e durabilidade que pode ser informada ao cliente"],
     precos: { P: 49.9, G: 79.9 },
     requiresEvaluation: false,
     destaque: true,
@@ -191,8 +247,17 @@ export const servicosAvulsos: Servico[] = [
   {
     id: "descontaminacao-protecao-motor",
     nome: "Descontaminação e Proteção de Motor",
-    shortDescription: "Limpeza e proteção cuidadosa do compartimento.",
+    shortDescription: "Limpeza técnica do cofre do motor, com proteção dos componentes sensíveis.",
     categoria: "protecao",
+    includes: [
+      "Proteção de componentes sensíveis",
+      "Limpeza técnica do cofre",
+      "Remoção de sujeira e oleosidade",
+      "Secagem cuidadosa",
+      "Acabamento e proteção compatível",
+    ],
+    expectedResult: "Cofre do motor limpo, organizado e protegido.",
+    aConfirmar: ["Indicação (\"ideal para\"), produtos usados e restrições do serviço"],
     precos: { P: 119.9, G: 159.9 },
     requiresEvaluation: false,
     destaque: true,
@@ -202,42 +267,195 @@ export const servicosAvulsos: Servico[] = [
     nome: "Descontaminação e Proteção de Chassis",
     shortDescription: "Remove sujeira pesada e protege a parte inferior do carro.",
     categoria: "protecao",
+    includes: [
+      "Limpeza inferior",
+      "Remoção de sujeira pesada",
+      "Desengraxe, quando necessário",
+      "Limpeza das áreas acessíveis",
+      "Proteção e acabamento das superfícies compatíveis",
+    ],
+    aConfirmar: ["Indicação (\"ideal para\"), resultado esperado e produto de proteção aplicado"],
     precos: { P: 99.9, G: 149.9 },
     requiresEvaluation: false,
   },
   {
     id: "restauracao-vitrificacao-plasticos",
     nome: "Restauração e Vitrificação de Plásticos",
-    shortDescription: "Renova e protege plásticos externos desgastados.",
+    shortDescription: "Recupera a aparência e protege os plásticos desgastados.",
     categoria: "estetica",
+    includes: [
+      "Limpeza profunda dos plásticos",
+      "Preparação",
+      "Recuperação visual, quando possível",
+      "Aplicação do produto de proteção/vitrificação",
+      "Acabamento",
+    ],
+    expectedResult: "Melhor aparência, proteção e conservação dos plásticos.",
+    technicalNote: `A recuperação depende do estado dos plásticos. ${notaAvaliacao}`,
+    aConfirmar: ["Produto de vitrificação e se cobre plásticos internos, externos ou ambos"],
     precos: null,
     requiresEvaluation: true,
   },
   {
     id: "vitrificacao-pintura",
     nome: "Vitrificação de Pintura",
-    shortDescription: "Proteção de longa duração com brilho intenso.",
+    shortDescription: "Coating aplicado sobre a pintura preparada, para proteção superior.",
     categoria: "estetica",
+    idealFor: ["Quem busca proteção superior e conservação da pintura"],
+    includes: [
+      "Avaliação da pintura",
+      "Preparação",
+      "Descontaminação",
+      "Correção conforme necessidade e avaliação",
+      "Aplicação do coating/vitrificador",
+      "Cura conforme o produto",
+    ],
+    technicalNote: `O resultado depende da condição da pintura. ${notaAvaliacao}`,
+    aConfirmar: ["Coating utilizado, tempo de cura, durabilidade e resultado esperado a comunicar"],
     precos: null,
     requiresEvaluation: true,
   },
   {
     id: "polimento-tecnico",
     nome: "Polimento Técnico",
-    shortDescription: "Correção de imperfeições leves na pintura.",
+    shortDescription: "Correção de marcas leves a moderadas e recuperação do brilho.",
     categoria: "estetica",
+    idealFor: ["Perda de brilho", "Marcas leves a moderadas", "Pequenos riscos superficiais", "Swirls"],
+    includes: [
+      "Avaliação da pintura",
+      "Descontaminação",
+      "Correção de defeitos conforme a condição",
+      "Refino",
+      "Acabamento",
+    ],
+    technicalNote: `Riscos profundos podem exigir outro procedimento. O resultado depende da condição da pintura. ${notaAvaliacao}`,
+    aConfirmar: ["Número de etapas de correção e resultado esperado a comunicar"],
     precos: null,
     requiresEvaluation: true,
   },
   {
     id: "polimento-detalhado",
     nome: "Polimento Detalhado",
-    shortDescription: "Acabamento refinado para um brilho de showroom.",
+    shortDescription: "Correção em etapas, com atenção às áreas pequenas e de difícil acesso.",
     categoria: "estetica",
+    includes: [
+      "Avaliação completa",
+      "Preparação",
+      "Etapas de correção conforme a necessidade",
+      "Atenção a áreas pequenas e de difícil acesso",
+      "Refino",
+      "Acabamento final",
+    ],
+    technicalNote: `Riscos profundos podem exigir outro procedimento. ${notaAvaliacao}`,
+    aConfirmar: ["O que o diferencia do Polimento Técnico, indicação e resultado esperado"],
     precos: null,
     requiresEvaluation: true,
   },
 ];
+
+/**
+ * Lavagem/benefício agendável de um plano. `nome` é a chave usada em `servicosPorPlano`,
+ * `regrasBeneficios` e gravada no agendamento.
+ */
+export interface LavagemPlano extends FichaTecnica {
+  /** null = não é um nível de lavagem (Manutenção). */
+  nivel: NivelCuidado | null;
+  /** Nome da lavagem cujos itens esta herda ("Inclui tudo da ... +"). */
+  incluiTudoDe?: string;
+  /** O que este nível entrega de concreto: produtos, processos, proteção, etapas. */
+  diferencial: string;
+}
+
+export const lavagensPlano: Record<string, LavagemPlano> = {
+  "Lavagem Black": {
+    id: "lavagem-black",
+    nome: "Lavagem Black",
+    nivel: 1,
+    shortDescription: "Manutenção essencial para manter seu carro limpo e apresentável.",
+    idealFor: ["Manutenção frequente", "Quem quer o carro limpo e apresentável toda semana"],
+    includes: [
+      "Lavagem externa",
+      "Rodas e pneus",
+      "Caixas de rodas com desengraxante apropriado",
+      "Caixas de portas",
+      "Secagem detalhada",
+      "Pretinho nos pneus",
+      "Aspiração interna básica",
+      "Painel e superfícies de contato",
+      "Limpeza básica dos vidros",
+    ],
+    expectedResult: "Carro limpo por fora e por dentro, seco e apresentável.",
+    diferencial:
+      "Vai além da Ducha: soma caixas de rodas, aspiração interna, painel e vidros à lavagem externa.",
+  },
+  "Lavagem Gold": {
+    id: "lavagem-gold",
+    nome: "Lavagem Gold",
+    nivel: 2,
+    shortDescription:
+      "Limpeza com produtos de nível superior e proteção adicional para conservar pintura, plásticos e acabamento.",
+    idealFor: ["Quem quer limpeza, conservação e proteção no mesmo cuidado"],
+    incluiTudoDe: "Lavagem Black",
+    includes: [
+      "Shampoo de lavagem de linha superior",
+      "Produto específico para rodas",
+      "Proteção de pintura com selante ou produto de manutenção premium",
+      "Proteção e acabamento dos plásticos externos",
+      "Acabamento premium dos pneus",
+      "Produto específico para vidros",
+      "Proteção e acabamento do painel e das superfícies internas compatíveis",
+    ],
+    expectedResult: "Carro limpo, com pintura, plásticos, pneus e painel protegidos.",
+    diferencial:
+      "Acrescenta à Black a etapa de proteção: selante na pintura, acabamento nos plásticos externos, pneus e painel, com produtos específicos para rodas e vidros.",
+    aConfirmar: [
+      "Quais produtos de linha superior são usados (shampoo, rodas, vidros)",
+      "Produto de proteção de pintura da Gold (selante ou manutenção premium)",
+    ],
+  },
+  "Lavagem Diamante": {
+    id: "lavagem-diamante",
+    nome: "Lavagem Diamante",
+    nivel: 3,
+    shortDescription:
+      "O tratamento mais completo da PitStop084 para quem busca conservação, acabamento e preservação superior.",
+    idealFor: ["Quem busca o máximo padrão de acabamento e preservação"],
+    incluiTudoDe: "Lavagem Gold",
+    includes: [
+      "Proteção de pintura de nível superior à da Gold",
+      "Tratamento e proteção dos plásticos internos e externos compatíveis",
+      "Acabamento de pneus de maior durabilidade",
+      "Limpeza técnica de áreas de difícil acesso",
+      "Proteção de vidros",
+      "Inspeção visual final",
+      "Finalização com produto de alto brilho e proteção, no padrão PitStop084",
+    ],
+    expectedResult: "Carro limpo, protegido e com o acabamento preservado.",
+    diferencial:
+      "Acrescenta à Gold a etapa de preservação: proteção de pintura de nível superior, tratamento dos plásticos internos, limpeza técnica de áreas de difícil acesso e inspeção final.",
+    aConfirmar: ["Produtos de proteção de pintura e de vidros da Diamante"],
+  },
+  "Manutenção": {
+    id: "manutencao-pitpass",
+    nome: "Manutenção",
+    nivel: null,
+    shortDescription: "Cuidado periódico para preservar o resultado da lavagem principal ao longo do mês.",
+    idealFor: ["Manter o padrão entre as lavagens principais"],
+    includes: [
+      "Lavagem externa de manutenção",
+      "Rodas e pneus",
+      "Aspiração leve",
+      "Painel e superfícies",
+      "Vidros",
+      "Caixas de portas",
+      "Secagem",
+      "Acabamento",
+    ],
+    expectedResult: "Padrão da lavagem principal mantido até o próximo cuidado completo.",
+    diferencial:
+      "Não é outra lavagem completa do plano: é a manutenção que conserva o resultado dela, sem repetir as etapas de proteção.",
+  },
+};
 
 /** Rótulos genéricos das etapas do agendamento, usados no indicador de progresso. */
 export const etapasAgendamento = ["Como agendar", "Serviço", "Horário", "Ficha técnica", "PitPass"];
@@ -290,25 +508,6 @@ export const horariosAgendamento = [
   "16:00",
   "17:00",
 ];
-
-/** Descrição curta de cada benefício agendável dos planos, para o passo "o que você quer usar?". */
-export const beneficiosAgendaveis: Record<string, string> = {
-  "Lavagem Black": "Seu cuidado recorrente para manter o carro limpo e apresentável durante a semana.",
-  "Lavagem Gold": "Tratamento completo de conservação e proteção do veículo.",
-  "Lavagem Diamante": "O cuidado mais completo da PitStop084 para o seu carro.",
-  "Manutenção": "Cuidado periódico para manter o padrão da sua lavagem em dia.",
-};
-
-/**
- * "Ideal para" de cada benefício — ajuda o assinante a diferenciar as opções na hora de escolher.
- * Paráfrase direta da descrição em `beneficiosAgendaveis` acima, sem inventar procedimento técnico novo.
- */
-export const idealParaBeneficio: Record<string, string> = {
-  "Lavagem Black": "Quando você quer manter o carro limpo e apresentável no dia a dia.",
-  "Lavagem Gold": "Quando você quer um cuidado mais completo de conservação e proteção.",
-  "Lavagem Diamante": "Quando você quer o tratamento mais completo disponível no seu plano.",
-  "Manutenção": "Quando você quer manter o padrão da sua lavagem em dia entre um cuidado maior e outro.",
-};
 
 /** Descreve a cota real de um benefício (de `regrasBeneficios`), sem inventar número nenhum. */
 export function formatarRegraBeneficio(regra: { tipo: "ciclo" | "semanal"; limite: number | null }): string {
