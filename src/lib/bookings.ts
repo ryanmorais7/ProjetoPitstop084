@@ -4,6 +4,7 @@ import { agendamentos, clientes, veiculos, beneficioUsos, assinaturas, StatusAge
 import { dataValidaParaAgendar, horarioValidoParaAgendar, hojeIso } from "./agenda";
 import { VehicleSize, regrasBeneficios, PlanoId } from "./data";
 import { gerarTokenCheckin } from "./checkin";
+import { Estagio, lerHistoricoEstagios } from "./operacao";
 
 export function normalizarTelefone(telefone: string): string {
   return telefone.replace(/\D/g, "");
@@ -217,6 +218,12 @@ export interface DadosNovoAgendamento {
   observacoes?: string | null;
   origem: "landing" | "admin";
   responsavelFechamento?: string | null;
+  responsavelAtendimento?: string | null;
+  /**
+   * Encaixe: o carro já está na loja, sem reserva. Não passa pela validação de horário
+   * (a hora é a de agora, fora da grade) e já entra como CHEGOU.
+   */
+  encaixe?: boolean;
   /** Se for uso de benefício PitPass, a assinatura ativa correspondente. */
   assinaturaId?: number | null;
 }
@@ -226,11 +233,13 @@ export type ResultadoCriarAgendamento =
   | { ok: false; erro: string; status: number };
 
 export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<ResultadoCriarAgendamento> {
-  if (!horarioValidoParaAgendar(dados.dia, dados.horario)) {
-    return { ok: false, erro: "Data ou horário inválido.", status: 400 };
-  }
-  if (!dataValidaParaAgendar(dados.dia)) {
-    return { ok: false, erro: "Data inválida.", status: 400 };
+  if (!dados.encaixe) {
+    if (!horarioValidoParaAgendar(dados.dia, dados.horario)) {
+      return { ok: false, erro: "Data ou horário inválido.", status: 400 };
+    }
+    if (!dataValidaParaAgendar(dados.dia)) {
+      return { ok: false, erro: "Data inválida.", status: 400 };
+    }
   }
 
   const { cliente } = await buscarOuCriarCliente({
@@ -271,6 +280,7 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
         observacoes: dados.observacoes ?? null,
         origem: dados.origem,
         responsavelFechamento: dados.responsavelFechamento ?? null,
+        responsavelAtendimento: dados.responsavelAtendimento ?? null,
         dia: dados.dia,
         horario: dados.horario,
         checkinToken,
@@ -300,6 +310,8 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
     }
   }
 
+  if (dados.encaixe) await moverEstagio(registro.id, "chegou");
+
   return {
     ok: true,
     id: registro.id,
@@ -308,6 +320,46 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
     clienteId: cliente.id,
     clienteCodigo: cliente.codigo ?? "",
   };
+}
+
+/**
+ * Move o carro de estágio (Kanban da Agenda, check-in, concluir...). Único lugar que escreve
+ * `estagio`: mantém os horários reais, o histórico de movimentação, o `status` comercial e o
+ * uso do benefício PitPass coerentes entre si.
+ * - pronto/entregue = serviço concluído (status "concluido", benefício consumido);
+ * - voltar pra antes de pronto reabre o agendamento (status "confirmado", benefício reservado).
+ * Nada do histórico é apagado.
+ */
+export async function moverEstagio(id: number, destino: Estagio): Promise<boolean> {
+  const [registro] = await db.select().from(agendamentos).where(eq(agendamentos.id, id));
+  if (!registro || registro.status === "cancelado") return false;
+
+  const agora = new Date();
+  const concluido = destino === "pronto" || destino === "entregue";
+  const historico = [...lerHistoricoEstagios(registro.historicoEstagios), { estagio: destino, em: agora.toISOString() }];
+
+  await db
+    .update(agendamentos)
+    .set({
+      estagio: destino,
+      estagioDesde: agora,
+      historicoEstagios: JSON.stringify(historico),
+      status: concluido ? "concluido" : "confirmado",
+      checkedInAt: destino === "agendado" ? null : (registro.checkedInAt ?? agora),
+      startedAt: destino === "agendado" || destino === "chegou" ? null : (registro.startedAt ?? agora),
+      completedAt: concluido ? (registro.completedAt ?? agora) : null,
+      readyAt: concluido ? (registro.readyAt ?? agora) : null,
+      deliveredAt: destino === "entregue" ? (registro.deliveredAt ?? agora) : null,
+    })
+    .where(eq(agendamentos.id, id));
+
+  // benefício: concluir consome, reabrir volta a reservar (uso já liberado por cancelamento não muda)
+  await db
+    .update(beneficioUsos)
+    .set({ status: concluido ? "utilizado" : "reservado" })
+    .where(and(eq(beneficioUsos.agendamentoId, id), ne(beneficioUsos.status, "liberado")));
+
+  return true;
 }
 
 /** Check-in na chegada: grava o horário real uma única vez, só pra agendamentos ainda abertos. */

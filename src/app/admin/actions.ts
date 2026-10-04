@@ -7,7 +7,8 @@ import { db } from "@/db/client";
 import { agendamentos, horariosBloqueados, StatusAgendamento } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { COOKIE_SESSAO, criarTokenSessao, exigirSessaoAdmin, senhaValida } from "@/lib/adminAuth";
-import { atualizarStatus, registrarCheckin, iniciarAtendimento } from "@/lib/bookings";
+import { atualizarStatus, moverEstagio } from "@/lib/bookings";
+import { analisarServicos, Estagio, estagioValido, itensChecklistSaida } from "@/lib/operacao";
 import {
   AgendamentoRecepcao,
   buscarAgendamentoPorCodigo,
@@ -57,7 +58,54 @@ function revalidarAtendimento(id: number) {
 
 export async function atualizarStatusAgendamento(id: number, status: StatusAgendamento) {
   await exigirSessaoAdmin();
-  await atualizarStatus(id, status);
+  // concluir pela lista = carro entregue; o caminho detalhado (pronto → entregue) fica no Kanban
+  if (status === "concluido") await moverEstagio(id, "entregue");
+  else await atualizarStatus(id, status);
+  revalidarAtendimento(id);
+}
+
+/**
+ * Kanban da Agenda. Tirar o carro de AGENDADO é o check-in: só passa com a placa conferida
+ * (o QR identifica o agendamento, a placa confirma o veículo).
+ */
+export async function moverEstagioAgendamento(
+  id: number,
+  destino: Estagio,
+  placaConferida: boolean
+): Promise<{ ok: boolean; erro?: string }> {
+  await exigirSessaoAdmin();
+  if (!estagioValido(destino)) return { ok: false, erro: "Estágio inválido." };
+
+  const [registro] = await db
+    .select({ estagio: agendamentos.estagio, checkedInAt: agendamentos.checkedInAt, status: agendamentos.status })
+    .from(agendamentos)
+    .where(eq(agendamentos.id, id));
+  if (!registro || registro.status === "cancelado") return { ok: false, erro: "Agendamento não encontrado." };
+
+  const aindaNaoChegou = !registro.checkedInAt && (registro.estagio ?? "agendado") === "agendado";
+  if (aindaNaoChegou && destino !== "agendado" && !placaConferida) {
+    return { ok: false, erro: "Confira a placa do veículo antes do check-in." };
+  }
+
+  await moverEstagio(id, destino);
+  revalidarAtendimento(id);
+  return { ok: true };
+}
+
+/** Painel do atendimento na Agenda: responsável, cliente aguardando e checklist de finalização. */
+export async function salvarPainelAtendimento(id: number, formData: FormData) {
+  await exigirSessaoAdmin();
+  const checklist = Object.fromEntries(
+    itensChecklistSaida.map((item) => [item.chave, formData.get(`saida-${item.chave}`) === "on"])
+  );
+  await db
+    .update(agendamentos)
+    .set({
+      responsavelAtendimento: String(formData.get("responsavelAtendimento") ?? "").trim() || null,
+      clienteAguardando: formData.get("clienteAguardando") === "on",
+      checklistSaida: JSON.stringify(checklist),
+    })
+    .where(eq(agendamentos.id, id));
   revalidarAtendimento(id);
 }
 
@@ -65,13 +113,23 @@ export async function atualizarStatusAgendamento(id: number, status: StatusAgend
 export async function fazerCheckin(id: number, formData: FormData) {
   await exigirSessaoAdmin();
   if (formData.get("placaConferida") !== "on") return;
-  await registrarCheckin(id);
+  await moverEstagio(id, "chegou");
   revalidarAtendimento(id);
 }
 
 export async function iniciarAtendimentoAgendamento(id: number) {
   await exigirSessaoAdmin();
-  await iniciarAtendimento(id);
+  // primeiro estágio de serviço do fluxo deste carro (lavagem; o detail vem depois, se houver)
+  const [registro] = await db
+    .select({
+      tipoAtendimento: agendamentos.tipoAtendimento,
+      servicoNome: agendamentos.servicoNome,
+      servicosAdicionais: agendamentos.servicosAdicionais,
+    })
+    .from(agendamentos)
+    .where(eq(agendamentos.id, id));
+  if (!registro) return;
+  await moverEstagio(id, analisarServicos(registro).fluxo[2]);
   revalidarAtendimento(id);
 }
 

@@ -144,6 +144,8 @@ export interface FichaTecnica {
   expectedResult?: string;
   /** Limitações e avisos ("Importante") que evitam promessa errada. */
   technicalNote?: string;
+  /** Tempo estimado em minutos. Só preencher com tempo confirmado pela operação. */
+  duracaoMin?: number;
   /**
    * Pontos que a operação ainda precisa confirmar. NUNCA aparece no site:
    * é a lista de pendências desta ficha.
@@ -158,6 +160,8 @@ export interface Servico extends FichaTecnica {
   precos: Record<VehicleSize, number> | null;
   requiresEvaluation: boolean;
   destaque?: boolean;
+  /** Serviço técnico: precisa do detailer (o Kanban manda pro fluxo EM DETAIL). */
+  exigeDetailer?: boolean;
 }
 
 export function precoServico(servico: Servico, porte: VehicleSize): number | null {
@@ -178,6 +182,7 @@ export const duchaPitstop: Servico = {
     "Pretinho nos pneus",
   ],
   duracao: "Aproximadamente 45 minutos",
+  duracaoMin: 45,
   expectedResult: "Veículo limpo, seco e com pneus renovados.",
   precos: { P: 49.9, G: 49.9 },
   requiresEvaluation: false,
@@ -280,6 +285,7 @@ export const servicosAvulsos: Servico[] = [
   },
   {
     id: "restauracao-vitrificacao-plasticos",
+    exigeDetailer: true,
     nome: "Restauração e Vitrificação de Plásticos",
     shortDescription: "Recupera a aparência e protege os plásticos desgastados.",
     categoria: "estetica",
@@ -298,6 +304,7 @@ export const servicosAvulsos: Servico[] = [
   },
   {
     id: "vitrificacao-pintura",
+    exigeDetailer: true,
     nome: "Vitrificação de Pintura",
     shortDescription: "Coating aplicado sobre a pintura preparada, para proteção superior.",
     categoria: "estetica",
@@ -317,6 +324,7 @@ export const servicosAvulsos: Servico[] = [
   },
   {
     id: "polimento-tecnico",
+    exigeDetailer: true,
     nome: "Polimento Técnico",
     shortDescription: "Correção de marcas leves a moderadas e recuperação do brilho.",
     categoria: "estetica",
@@ -335,6 +343,7 @@ export const servicosAvulsos: Servico[] = [
   },
   {
     id: "polimento-detalhado",
+    exigeDetailer: true,
     nome: "Polimento Detalhado",
     shortDescription: "Correção em etapas, com atenção às áreas pequenas e de difícil acesso.",
     categoria: "estetica",
@@ -468,7 +477,7 @@ export function linkWhatsapp(mensagem: string) {
 
 /** Conversa com um CLIENTE (o admin usa isso; `linkWhatsapp` acima fala com a loja). */
 export function linkWhatsappPara(telefone: string, mensagem: string) {
-  let digitos = telefone.replace(/D/g, "");
+  let digitos = telefone.replace(/\D/g, "");
   if (digitos.length <= 11) digitos = "55" + digitos;
   return `https://wa.me/${digitos}?text=${encodeURIComponent(mensagem)}`;
 }

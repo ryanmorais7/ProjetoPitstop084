@@ -91,3 +91,8 @@ export function formatarDataCurta(dataIso: string): string {
   return `${diaAbreviadoCurto[data.getUTCDay()]} • ${data.getUTCDate()} ${mesAbreviado[data.getUTCMonth()]}`;
 }
 
+
+/** Instante atual em ms. O servidor entrega isso ao quadro da Agenda pra hidratar os cronômetros sem divergência. */
+export function agoraMs(): number {
+  return Date.now();
+}

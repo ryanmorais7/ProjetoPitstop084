@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientes, assinaturas } from "@/db/schema";
 import { exigirSessaoAdmin } from "@/lib/adminAuth";
+import { hojeIso, horaAtualFortaleza } from "@/lib/agenda";
+import { lerContextoAgendar, queryContextoAgendar } from "@/lib/contextoAgendar";
 import { buscarOuCriarCliente, buscarOuCriarVeiculo, calcularCiclo, criarAgendamento } from "@/lib/bookings";
 import {
   PlanoId,
@@ -38,7 +40,9 @@ export async function criarClienteManual(formData: FormData) {
 
   revalidatePath("/admin/clientes");
   // vindo do "Novo agendamento", segue direto pro passo de veículo/serviço
-  redirect(formData.get("destino") === "agendar" ? `/admin/clientes/${cliente.id}/agendar` : `/admin/clientes/${cliente.id}`);
+  if (formData.get("destino") !== "agendar") redirect(`/admin/clientes/${cliente.id}`);
+  const extra = queryContextoAgendar(lerContextoAgendar(formData));
+  redirect(`/admin/clientes/${cliente.id}/agendar${extra ? `?${extra}` : ""}`);
 }
 
 export async function editarCliente(clienteId: number, formData: FormData) {
@@ -128,8 +132,11 @@ export async function criarAgendamentoManual(
   const placa = String(formData.get("placa") ?? "").trim() || null;
   const porte = (formData.get("porte") === "G" ? "G" : "P") as VehicleSize;
   const tipoAtendimento = formData.get("tipoAtendimento") === "assinatura" ? "assinatura" : "avulso";
-  const dia = String(formData.get("dia") ?? "");
-  const horario = String(formData.get("horario") ?? "");
+  // encaixe: carro já na loja, sem reserva. Entra com a data e a hora de agora (fora da grade).
+  const encaixe = formData.get("encaixe") === "1";
+  const dia = encaixe ? hojeIso() : String(formData.get("dia") ?? "");
+  const horario = encaixe ? horaAtualFortaleza() : String(formData.get("horario") ?? "");
+  const responsavelAtendimento = String(formData.get("responsavelAtendimento") ?? "").trim() || null;
   const transporte = String(formData.get("transporte") ?? "") || null;
   const observacoes = String(formData.get("observacoes") ?? "").trim() || null;
   const valorAjustadoStr = String(formData.get("valorAjustado") ?? "").trim();
@@ -212,6 +219,8 @@ export async function criarAgendamentoManual(
     observacoes,
     origem: "admin",
     responsavelFechamento,
+    responsavelAtendimento,
+    encaixe,
     assinaturaId,
   });
 
@@ -222,5 +231,6 @@ export async function criarAgendamentoManual(
   revalidatePath("/admin/agendamentos");
   revalidatePath("/admin/agenda");
   revalidatePath(`/admin/clientes/${clienteId}`);
-  redirect(`/admin/atendimentos/${resultado.id}?novo=1`);
+  // encaixe volta pro quadro: o carro já aparece em CHEGOU
+  redirect(encaixe ? "/admin/agenda" : `/admin/atendimentos/${resultado.id}?novo=1`);
 }

@@ -180,7 +180,10 @@ export default function AdminShell({ children, sair }: { children: ReactNode; sa
             </Link>
           </header>
 
-          <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-8 lg:py-8">{children}</main>
+          {/* o quadro da Agenda usa a largura toda; o resto fica em coluna de leitura */}
+          <main className={`mx-auto w-full px-4 py-6 lg:px-8 lg:py-8 ${caminho === "/admin/agenda" ? "" : "max-w-6xl"}`}>
+            {children}
+          </main>
         </div>
 
         <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-5 z-[60] flex justify-center px-4">

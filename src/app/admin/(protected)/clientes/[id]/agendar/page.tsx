@@ -7,10 +7,13 @@ import { buscarClienteComDetalhes } from "@/lib/clientes";
 import { hojeIso, proximasDatasUteis, paraIso } from "@/lib/agenda";
 import { planos, PlanoId } from "@/lib/data";
 import ClienteBadge from "@/components/admin/ClienteBadge";
+import { lerContextoAgendar, queryContextoAgendar } from "@/lib/contextoAgendar";
 import NovoAtendimentoForm from "./NovoAtendimentoForm";
 
-export default async function AgendarPage({ params }: PageProps<"/admin/clientes/[id]/agendar">) {
+export default async function AgendarPage({ params, searchParams }: PageProps<"/admin/clientes/[id]/agendar">) {
   const { id } = await params;
+  const contexto = lerContextoAgendar(await searchParams);
+  const extra = queryContextoAgendar(contexto);
   const clienteId = Number(id);
   const dados = Number.isFinite(clienteId) ? await buscarClienteComDetalhes(clienteId) : null;
   if (!dados) notFound();
@@ -44,7 +47,7 @@ export default async function AgendarPage({ params }: PageProps<"/admin/clientes
             <span className="font-mono text-[11px] text-adm-muted">{dados.cliente.codigo}</span>
           </div>
         </div>
-        <Link href="/admin/agendamentos/novo" className="adm-btn">
+        <Link href={`/admin/agendamentos/novo${extra ? `?${extra}` : ""}`} className="adm-btn">
           Trocar cliente
         </Link>
       </div>
@@ -64,6 +67,9 @@ export default async function AgendarPage({ params }: PageProps<"/admin/clientes
         nomePlanoAtivo={nomePlanoAtivo}
         datasIso={datasIso}
         chavesOcupadas={chavesOcupadas}
+        encaixe={contexto.encaixe}
+        diaInicial={contexto.dia}
+        horaInicial={contexto.hora}
       />
     </div>
   );

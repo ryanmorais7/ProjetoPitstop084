@@ -137,6 +137,23 @@ export const agendamentos = pgTable(
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /**
+     * Estágio operacional do carro na loja (Kanban da Agenda): "agendado" | "chegou" | "lavagem" |
+     * "detail" | "finalizacao" | "pronto" | "entregue". Separado de `status`, que continua sendo
+     * a verdade comercial (ocupa horário, consome benefício). Null = registro antigo: o estágio
+     * é derivado de status + horários (src/lib/operacao.ts).
+     */
+    estagio: text("estagio"),
+    /** Quando entrou no estágio atual (o cronômetro do card conta a partir daqui). */
+    estagioDesde: timestamp("estagio_desde", { withTimezone: true }),
+    readyAt: timestamp("ready_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    /** JSON de [{ estagio, em }] com cada movimentação, em ordem. Nunca é apagado. */
+    historicoEstagios: text("historico_estagios"),
+    /** Cliente esperando na loja: prioridade operacional (não tem relação com PitPass). */
+    clienteAguardando: boolean("cliente_aguardando"),
+    /** JSON com o checklist opcional de finalização. */
+    checklistSaida: text("checklist_saida"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

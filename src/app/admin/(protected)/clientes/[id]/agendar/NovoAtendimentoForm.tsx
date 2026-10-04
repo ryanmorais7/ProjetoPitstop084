@@ -69,7 +69,15 @@ export default function NovoAtendimentoForm({
   nomePlanoAtivo,
   datasIso,
   chavesOcupadas,
+  encaixe = false,
+  diaInicial = null,
+  horaInicial = null,
 }: {
+  /** Carro já na loja, sem reserva: não escolhe data/hora e entra direto em CHEGOU. */
+  encaixe?: boolean;
+  /** Slot escolhido na Agenda (clique em DISPONÍVEL). */
+  diaInicial?: string | null;
+  horaInicial?: string | null;
   clienteId: number;
   nomeCliente: string;
   telefoneCliente: string;
@@ -93,8 +101,10 @@ export default function NovoAtendimentoForm({
   const [avulsosIds, setAvulsosIds] = useState<Set<string>>(new Set());
   const [planoId, setPlanoId] = useState<PlanoId>((assinaturaAtiva?.plano as PlanoId) ?? listaPlanos[0].id);
   const [servicoPlano, setServicoPlano] = useState<string>(servicosPorPlano[planoId]?.[0] ?? "");
-  const [dataSelecionadaIso, setDataSelecionadaIso] = useState<string | null>(null);
-  const [horaSelecionada, setHoraSelecionada] = useState<string | null>(null);
+  // slot vindo da Agenda só vale se ainda estiver livre
+  const slotInicialLivre = Boolean(diaInicial && horaInicial && !chavesOcupadas.includes(`${diaInicial}-${horaInicial}`));
+  const [dataSelecionadaIso, setDataSelecionadaIso] = useState<string | null>(diaInicial);
+  const [horaSelecionada, setHoraSelecionada] = useState<string | null>(slotInicialLivre ? horaInicial : null);
   const [transporte, setTransporte] = useState<"" | "leva_busca">("");
   const [valorAjustado, setValorAjustado] = useState("");
 
@@ -125,6 +135,7 @@ export default function NovoAtendimentoForm({
       <input type="hidden" name="nome" value={nomeCliente} />
       <input type="hidden" name="telefone" value={telefoneCliente} />
       <input type="hidden" name="tipoAtendimento" value={tipoAtendimento} />
+      {encaixe && <input type="hidden" name="encaixe" value="1" />}
 
       <Etapa numero={1} titulo="Veículo">
         {veiculos.length > 0 && (
@@ -279,6 +290,18 @@ export default function NovoAtendimentoForm({
         )}
       </Etapa>
 
+      {encaixe ? (
+        <Etapa numero={3} titulo="Encaixe">
+          <p className="text-sm text-adm-muted">
+            Sem reserva: o atendimento entra com a data e a hora de agora e o carro vai direto para CHEGOU no quadro.
+            A agenda de horários da landing não é alterada.
+          </p>
+          <label className="mt-4 block">
+            <span className="adm-rotulo mb-1.5 block">Responsável pelo atendimento</span>
+            <input name="responsavelAtendimento" className="campo" placeholder="Lavador ou detailer" />
+          </label>
+        </Etapa>
+      ) : (
       <Etapa numero={3} titulo="Data e horário">
         <DateTimePicker
           claro
@@ -297,6 +320,7 @@ export default function NovoAtendimentoForm({
         <input type="hidden" name="dia" value={dataSelecionadaIso ?? ""} />
         <input type="hidden" name="horario" value={horaSelecionada ?? ""} />
       </Etapa>
+      )}
 
       <Etapa numero={4} titulo="Entrega e observações">
         <div className="flex flex-wrap gap-2">
@@ -360,11 +384,13 @@ export default function NovoAtendimentoForm({
 
       <button
         type="submit"
-        disabled={pendente || !dataSelecionadaIso || !horaSelecionada}
+        disabled={pendente || (!encaixe && (!dataSelecionadaIso || !horaSelecionada))}
         className="adm-btn adm-btn-primario min-h-14 w-full text-base"
       >
         {pendente
           ? "Salvando..."
+          : encaixe
+          ? "Registrar encaixe e dar entrada"
           : dataSelecionadaIso && horaSelecionada
           ? `Confirmar agendamento · ${horaSelecionada}`
           : "Escolha data e horário"}

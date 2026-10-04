@@ -3,7 +3,15 @@ import { db } from "@/db/client";
 import { agendamentos, assinaturas, clientes, veiculos } from "@/db/schema";
 import { hojeIso } from "./agenda";
 import { buscarClientes } from "./clientes";
-import { planos, PlanoId, linkWhatsappPara } from "./data";
+import { planos, PlanoId, linkWhatsappPara, portesVeiculo, VehicleSize } from "./data";
+import {
+  analisarServicos,
+  Estagio,
+  estagioDoRegistro,
+  EventoEstagio,
+  lerHistoricoEstagios,
+  Setor,
+} from "./operacao";
 
 /**
  * Consultas do admin operacional. Cada tela pede só o que mostra: listas não carregam
@@ -205,4 +213,116 @@ export async function buscaGlobal(q: string) {
       .limit(20),
   ]);
   return { clientes: clientesEncontrados.slice(0, 20), agendamentos: agendamentosEncontrados };
+}
+
+/** Tudo que um card do Kanban e o painel lateral precisam, já serializável pro navegador. */
+export interface CartaoAgenda {
+  id: number;
+  clienteId: number | null;
+  codigo: string | null;
+  dia: string;
+  horario: string;
+  nome: string;
+  telefone: string;
+  carro: string;
+  placa: string | null;
+  porteNome: string;
+  servico: string;
+  adicionais: string[];
+  /** null = cliente PitStop 084 (avulso, sem plano). */
+  nomePlano: string | null;
+  /** Todos os planos PitPass incluem atendimento prioritário. */
+  prioridade: boolean;
+  estagio: Estagio;
+  /** ISO de quando entrou no estágio atual (null em registro antigo, sem cronômetro). */
+  estagioDesde: string | null;
+  /** ISO do início do serviço, pra comparar com o tempo estimado. */
+  iniciadoEm: string | null;
+  estimativaMin: number | null;
+  exigeDetailer: boolean;
+  setor: Setor;
+  fluxo: Estagio[];
+  responsavel: string | null;
+  observacoes: string | null;
+  preferencias: string | null;
+  levaBusca: boolean;
+  endereco: { rua?: string; numero?: string; bairro?: string; referencia?: string } | null;
+  clienteAguardando: boolean;
+  checklistSaida: Record<string, boolean>;
+  historico: EventoEstagio[];
+  whatsappUrl: string;
+  avisoProntoUrl: string;
+}
+
+function lerJson<T>(json: string | null, padrao: T): T {
+  if (!json) return padrao;
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return padrao;
+  }
+}
+
+/** Cards do dia pro Kanban e pra visão por horários (cancelados ficam de fora). */
+export async function cartoesDoDia(dia: string): Promise<CartaoAgenda[]> {
+  const registros = await agendamentosDoDia(dia);
+  const idsClientes = [...new Set(registros.map((r) => r.clienteId).filter((id): id is number => id != null))];
+  const [planosAtivos, preferencias] = await Promise.all([
+    planosAtivosPorCliente(idsClientes),
+    idsClientes.length > 0
+      ? db
+          .select({ id: clientes.id, preferencias: clientes.preferencias })
+          .from(clientes)
+          .where(inArray(clientes.id, idsClientes))
+      : Promise.resolve([]),
+  ]);
+  const preferenciaPorCliente = new Map(preferencias.map((p) => [p.id, p.preferencias]));
+
+  return registros.flatMap((r) => {
+    const estagio = estagioDoRegistro(r);
+    if (!estagio) return [];
+    const analise = analisarServicos(r);
+    const ehAssinatura = r.tipoAtendimento === "assinatura";
+    const nomePlano =
+      ehAssinatura && r.plano
+        ? (planos[r.plano as PlanoId]?.nome ?? r.plano)
+        : ((r.clienteId ? planosAtivos.get(r.clienteId) : null) ?? null);
+    const primeiroNome = r.nome.trim().split(/\s+/)[0];
+
+    return [
+      {
+        id: r.id,
+        clienteId: r.clienteId,
+        codigo: r.codigo,
+        dia: r.dia,
+        horario: r.horario,
+        nome: r.nome,
+        telefone: r.telefone,
+        carro: r.carro,
+        placa: r.placa,
+        porteNome: (portesVeiculo[r.categoriaVeiculo as VehicleSize] ?? portesVeiculo.P).nome,
+        servico: ehAssinatura ? (r.servicoNome ?? "-") : (r.servicoNome ?? "Ducha Pitstop"),
+        adicionais: ehAssinatura ? [] : lerJson<AdicionalJson[]>(r.servicosAdicionais, []).map((a) => a.nome),
+        nomePlano,
+        prioridade: Boolean(nomePlano),
+        estagio,
+        estagioDesde: r.estagioDesde ? new Date(r.estagioDesde).toISOString() : null,
+        iniciadoEm: r.startedAt ? new Date(r.startedAt).toISOString() : null,
+        estimativaMin: analise.estimativaMin,
+        exigeDetailer: analise.exigeDetailer,
+        setor: analise.setor,
+        fluxo: analise.fluxo,
+        responsavel: r.responsavelAtendimento,
+        observacoes: r.observacoes,
+        preferencias: (r.clienteId ? preferenciaPorCliente.get(r.clienteId) : null) ?? null,
+        levaBusca: r.transporte === "leva_busca",
+        endereco: lerJson<CartaoAgenda["endereco"]>(r.enderecoSnapshot, null),
+        clienteAguardando: Boolean(r.clienteAguardando),
+        checklistSaida: lerJson<Record<string, boolean>>(r.checklistSaida, {}),
+        historico: lerHistoricoEstagios(r.historicoEstagios),
+        whatsappUrl: whatsappDoCliente(r),
+        avisoProntoUrl: linkWhatsappPara(r.telefone, `Olá, ${primeiroNome}! Seu veículo já está pronto na PitStop084.`),
+      } satisfies CartaoAgenda,
+    ];
+  });
 }

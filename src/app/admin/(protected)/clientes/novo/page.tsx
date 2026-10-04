@@ -1,6 +1,7 @@
 import { listarClientesResumo } from "@/lib/adminDados";
 import { origensCliente } from "@/lib/data";
 import ClienteLinha from "@/components/admin/ClienteLinha";
+import { lerContextoAgendar, queryContextoAgendar } from "@/lib/contextoAgendar";
 import { criarClienteManual } from "../../../clientes/actions";
 
 export default async function NovoClientePage({ searchParams }: PageProps<"/admin/clientes/novo">) {
@@ -8,6 +9,16 @@ export default async function NovoClientePage({ searchParams }: PageProps<"/admi
   const termo = typeof params.q === "string" ? params.q.trim() : "";
   const paraAgendar = params.destino === "agendar";
   const parecidos = termo ? await listarClientesResumo(termo) : [];
+  const contexto = lerContextoAgendar(params);
+  const extra = queryContextoAgendar(contexto);
+  const camposContexto = paraAgendar && (
+    <>
+      <input type="hidden" name="destino" value="agendar" />
+      {contexto.encaixe && <input type="hidden" name="encaixe" value="1" />}
+      {!contexto.encaixe && contexto.dia && <input type="hidden" name="dia" value={contexto.dia} />}
+      {!contexto.encaixe && contexto.hora && <input type="hidden" name="hora" value={contexto.hora} />}
+    </>
+  );
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -15,7 +26,7 @@ export default async function NovoClientePage({ searchParams }: PageProps<"/admi
         <h2 className="font-heading text-xl font-bold">Busque antes de cadastrar</h2>
         <p className="mt-1 text-sm text-adm-muted">Nome, WhatsApp, placa ou código. Evita cliente duplicado.</p>
         <form method="GET" action="/admin/clientes/novo" role="search" className="mt-4 flex gap-2">
-          {paraAgendar && <input type="hidden" name="destino" value="agendar" />}
+          {camposContexto}
           <label htmlFor="busca-duplicado" className="sr-only">
             Buscar cliente existente
           </label>
@@ -38,7 +49,7 @@ export default async function NovoClientePage({ searchParams }: PageProps<"/admi
           <h2 className="adm-rotulo mb-3">Já existe alguém parecido. Confira antes de continuar</h2>
           <div className="adm-card divide-y divide-adm-line overflow-hidden">
             {parecidos.map((c) => (
-              <ClienteLinha key={c.id} cliente={c} href={paraAgendar ? `/admin/clientes/${c.id}/agendar` : undefined} />
+              <ClienteLinha key={c.id} cliente={c} href={paraAgendar ? `/admin/clientes/${c.id}/agendar${extra ? `?${extra}` : ""}` : undefined} />
             ))}
           </div>
         </section>
@@ -48,7 +59,7 @@ export default async function NovoClientePage({ searchParams }: PageProps<"/admi
         <h2 className="font-heading text-xl font-bold">
           {parecidos.length > 0 ? "Não é nenhum deles? Cadastrar novo cliente" : "Cadastrar novo cliente"}
         </h2>
-        {paraAgendar && <input type="hidden" name="destino" value="agendar" />}
+        {camposContexto}
         <label className="block">
           <span className="adm-rotulo mb-1.5 block">Nome *</span>
           <input required name="nome" className="campo" placeholder="Nome do cliente" />
@@ -88,7 +99,7 @@ export default async function NovoClientePage({ searchParams }: PageProps<"/admi
           </label>
         </div>
         <button type="submit" className="adm-btn adm-btn-primario w-full">
-          {paraAgendar ? "Cadastrar e agendar" : "Cadastrar cliente"}
+          {paraAgendar ? (contexto.encaixe ? "Cadastrar e seguir com o encaixe" : "Cadastrar e agendar") : "Cadastrar cliente"}
         </button>
       </form>
     </div>

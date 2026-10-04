@@ -10,6 +10,7 @@ import { planos, PlanoId, portesVeiculo, VehicleSize } from "@/lib/data";
 import { whatsappDoCliente } from "@/lib/adminDados";
 import { garantirTokenCheckin, origemDaRequisicao, urlCheckin } from "@/lib/checkin";
 import { statusOperacional, formatarHoraFortaleza, dataIsoFortaleza } from "@/lib/pitpass";
+import { estagioDoRegistro, lerHistoricoEstagios, rotuloEstagio } from "@/lib/operacao";
 import QrCode from "@/components/QrCode";
 import ClienteBadge from "@/components/admin/ClienteBadge";
 import { StatusChip, ProximidadeChip, nomePlanoDoAgendamento } from "@/components/admin/AgendamentoCard";
@@ -91,11 +92,15 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
     }
   }
 
+  const estagio = estagioDoRegistro(registro);
+  const movimentacoes = lerHistoricoEstagios(registro.historicoEstagios);
+
   const linhaDoTempo = [
     { rotulo: "Agendado", em: registro.createdAt, dia: true },
     { rotulo: "Check-in", em: registro.checkedInAt },
     { rotulo: "Atendimento iniciado", em: registro.startedAt },
     { rotulo: "Atendimento concluído", em: registro.completedAt },
+    { rotulo: "Entregue ao cliente", em: registro.deliveredAt },
   ];
 
   return (
@@ -135,6 +140,11 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
           <div className="flex flex-wrap items-center gap-2">
             <ProximidadeChip registro={registro} hoje={hoje} horaAgora={horaAtualFortaleza()} />
             <StatusChip status={status} />
+            {estagio && status !== "cancelado" && (
+              <span className="adm-chip adm-status-em_atendimento" title="Estágio no quadro da Agenda">
+                {rotuloEstagio[estagio]}
+              </span>
+            )}
           </div>
         </div>
 
@@ -302,6 +312,24 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
           ))}
         </ol>
       </section>
+
+      {movimentacoes.length > 0 && (
+        <section aria-labelledby="movimentacoes">
+          <h3 id="movimentacoes" className="adm-rotulo mb-3">
+            Movimentações no quadro
+          </h3>
+          <ol className="adm-card divide-y divide-adm-line">
+            {movimentacoes.map((evento, i) => (
+              <li key={`${evento.em}-${i}`} className="flex items-baseline justify-between gap-4 px-5 py-3">
+                <span className="text-sm font-semibold uppercase tracking-wide">{rotuloEstagio[evento.estagio]}</span>
+                <span className="font-mono text-sm tabular-nums text-adm-muted">
+                  {formatarDataCurta(dataIsoFortaleza(evento.em))} {formatarHoraFortaleza(evento.em)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {/* Contato + QR */}
       <section className="adm-card flex items-center justify-between gap-4 p-5">
