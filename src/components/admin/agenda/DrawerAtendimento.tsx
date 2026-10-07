@@ -91,7 +91,7 @@ export default function DrawerAtendimento({
             <Dado rotulo="Placa">
               <span className="font-mono">{cartao.placa ?? "Não informada"}</span>
             </Dado>
-            <Dado rotulo="Porte">{cartao.porteNome}</Dado>
+            <Dado rotulo={cartao.ehMoto ? "Tipo" : "Porte"}>{cartao.porteNome}</Dado>
             <Dado rotulo="Plano">{cartao.nomePlano ? `PitPass ${cartao.nomePlano}` : "Sem plano"}</Dado>
             <Dado rotulo="Serviço" largo>
               {cartao.servico}
@@ -206,7 +206,7 @@ export default function DrawerAtendimento({
             </a>
           )}
           <Link href={`/admin/atendimentos/${cartao.id}`} className="adm-btn">
-            Ficha completa
+            {cartao.estagio === "pronto" || cartao.estagio === "entregue" ? "Ficha e recibo" : "Ficha completa"}
           </Link>
           {cartao.clienteId ? (
             <Link href={`/admin/clientes/${cartao.clienteId}`} className="adm-btn">

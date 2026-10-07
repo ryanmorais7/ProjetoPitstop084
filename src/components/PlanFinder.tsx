@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { listaPortesVeiculo, planos, PlanoId, VehicleSize } from "@/lib/data";
+import { listaPortesVeiculo, planos, PlanoId, precoPlano, VehicleSize } from "@/lib/data";
 import { getRecommendedPlan, perguntasPlano, RespostasPlano } from "@/lib/planFinder";
 import { formatarPrecoPartes } from "@/lib/format";
 import { useSelection } from "@/context/SelectionContext";
@@ -264,9 +264,9 @@ function Resultado({
   onComparar: () => void;
   onRefazer: () => void;
 }) {
-  const { porteVeiculo, definirPorteVeiculo } = useSelection();
-  const plano = planos[resultado.planoId];
-  const { moeda, valor } = formatarPrecoPartes(plano.precos[porteVeiculo]);
+  const { catalogo, porteVeiculo, definirPorteVeiculo } = useSelection();
+  const plano = catalogo.planos[resultado.planoId];
+  const { moeda, valor } = formatarPrecoPartes(precoPlano(plano, porteVeiculo) ?? 0);
 
   return (
     <div className="passo-entra mt-4">

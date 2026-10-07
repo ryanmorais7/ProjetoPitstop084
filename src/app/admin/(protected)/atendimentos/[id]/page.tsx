@@ -6,7 +6,10 @@ import { db } from "@/db/client";
 import { agendamentos, assinaturas, beneficioUsos, clientes } from "@/db/schema";
 import { formatarDataCurta, hojeIso, horaAtualFortaleza } from "@/lib/agenda";
 import { formatarPreco } from "@/lib/format";
-import { planos, PlanoId, portesVeiculo, VehicleSize } from "@/lib/data";
+import { planos, PlanoId, rotuloCategoriaVeiculo, tipoDaCategoria } from "@/lib/data";
+import { formatarDuracao } from "@/lib/catalogo";
+import { buscarAssinaturaVigente } from "@/lib/bookings";
+import { buscarReciboDoAtendimento } from "@/lib/recibos";
 import { whatsappDoCliente } from "@/lib/adminDados";
 import { garantirTokenCheckin, origemDaRequisicao, urlCheckin } from "@/lib/checkin";
 import { statusOperacional, formatarHoraFortaleza, dataIsoFortaleza } from "@/lib/pitpass";
@@ -46,7 +49,7 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
   const [registro] = await db.select().from(agendamentos).where(eq(agendamentos.id, agendamentoId));
   if (!registro) notFound();
 
-  const [token, origem, usos, assinaturaAtiva, cliente] = await Promise.all([
+  const [token, origem, usos, assinaturaAtiva, cliente, recibo, assinaturaVigente] = await Promise.all([
     garantirTokenCheckin(registro),
     origemDaRequisicao(),
     db.select().from(beneficioUsos).where(eq(beneficioUsos.agendamentoId, registro.id)),
@@ -64,6 +67,8 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
           .where(eq(clientes.id, registro.clienteId))
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
+    buscarReciboDoAtendimento(registro.id),
+    registro.clienteId ? buscarAssinaturaVigente(registro.clienteId) : Promise.resolve(null),
   ]);
 
   const hoje = hojeIso();
@@ -71,7 +76,9 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
   const ehAssinatura = registro.tipoAtendimento === "assinatura";
   const planoAtivo = assinaturaAtiva ? (planos[assinaturaAtiva.plano as PlanoId]?.nome ?? null) : null;
   const nomePlano = nomePlanoDoAgendamento(registro, planoAtivo);
-  const porte = portesVeiculo[(registro.categoriaVeiculo as VehicleSize) ?? "P"] ?? portesVeiculo.P;
+  const ehMoto = tipoDaCategoria(registro.categoriaVeiculo) === "moto";
+  // PitPass cadastrado pelo próprio cliente no site, ainda sem conferência da recepção
+  const pitpassPendente = ehAssinatura && assinaturaVigente?.status === "pendente";
   const aguardandoCheckin = status === "aguardando";
 
   let adicionais: AdicionalJson[] = [];
@@ -168,7 +175,7 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
             <Dado rotulo="Placa">
               <span className="font-mono">{registro.placa ?? "Não informada"}</span>
             </Dado>
-            <Dado rotulo="Porte">{porte.nome}</Dado>
+            <Dado rotulo={ehMoto ? "Tipo" : "Porte"}>{rotuloCategoriaVeiculo(registro.categoriaVeiculo)}</Dado>
             <Dado rotulo={ehAssinatura ? "Benefício do plano" : "Serviço"} largo>
               {ehAssinatura ? (
                 (registro.servicoNome ?? "-")
@@ -185,6 +192,9 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
               )}
             </Dado>
             <Dado rotulo="Plano">{nomePlano ? `PitPass ${nomePlano}` : "Sem plano"}</Dado>
+            <Dado rotulo="Duração estimada">
+              {registro.duracaoMin ? formatarDuracao(registro.duracaoMin) : "Não definida"}
+            </Dado>
             {ehAssinatura && usos.length > 0 && (
               <Dado rotulo="Uso do benefício" largo>
                 {usos.map((u) => `${u.beneficio}: ${rotuloUsoBeneficio[u.status] ?? u.status}`).join(" · ")}
@@ -196,6 +206,15 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
           </dl>
         </div>
       </section>
+
+      {pitpassPendente && registro.clienteId && (
+        <p className="rounded-xl bg-[#fdf1cf] px-5 py-4 text-sm font-medium text-[#5f4300]">
+          PitPass informado pelo cliente no site, ainda não confirmado pela recepção.{" "}
+          <Link href={`/admin/clientes/${registro.clienteId}`} className="underline underline-offset-4">
+            Confirmar na ficha do cliente
+          </Link>
+        </p>
+      )}
 
       {cliente?.preferencias && (
         <section className="rounded-xl bg-[#fdf1cf] px-5 py-4 text-[#5f4300]">
@@ -209,7 +228,17 @@ export default async function AtendimentoPage({ params, searchParams }: PageProp
         <CheckinPlaca id={registro.id} carro={registro.carro} placa={registro.placa} lido={lido === "1"} />
       )}
       {status === "concluido" && (
-        <p className="adm-card px-4 py-3 text-center text-sm font-semibold text-[#1c6a35]">✓ Atendimento concluído</p>
+        <div className="adm-card flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold text-[#1c6a35]">✓ Atendimento concluído</p>
+            <p className="mt-0.5 text-sm text-adm-muted">
+              {recibo?.numero ? `Recibo ${recibo.numero} emitido.` : "Nenhum recibo emitido para este atendimento."}
+            </p>
+          </div>
+          <Link href={`/admin/atendimentos/${registro.id}/recibo`} className={`adm-btn ${recibo?.numero ? "" : "adm-btn-primario"}`}>
+            {recibo?.numero ? "Ver recibo" : "Gerar recibo"}
+          </Link>
+        </div>
       )}
       {status === "cancelado" && (
         <p className="rounded-xl bg-[#fdecea] px-4 py-3 text-center text-sm font-semibold text-[#b42318]">

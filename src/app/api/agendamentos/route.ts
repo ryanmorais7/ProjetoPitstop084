@@ -1,152 +1,138 @@
 import { NextResponse } from "next/server";
-import { and, gte, ne, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { agendamentos, horariosBloqueados, assinaturas } from "@/db/schema";
 import {
-  duchaPitstop,
-  servicosAvulsos,
-  planos,
+  categoriaVeiculoValida,
+  CategoriaVeiculo,
   PlanoId,
   servicosPorPlano,
+  precoPlano,
   precoServico,
-  VehicleSize,
   horariosAgendamento,
 } from "@/lib/data";
 import { hojeIso, dataValidaParaAgendar } from "@/lib/agenda";
-import { criarAgendamento, buscarClientePorTelefone, verificarBeneficioDisponivel } from "@/lib/bookings";
+import { criarAgendamento, verificarBeneficioDisponivel } from "@/lib/bookings";
+import { adicionaisPara, disponivelNoSite, duracaoTotal, itemDoBeneficio, servicoBase } from "@/lib/catalogo";
+import { carregarCatalogo } from "@/lib/catalogoServidor";
+import { ocupacaoDaAgenda } from "@/lib/disponibilidade";
+import { buscarAssinante } from "@/lib/assinante";
+import { telefoneValido } from "@/lib/format";
 import { urlCheckin } from "@/lib/checkin";
 
+/**
+ * Agenda pública: os trechos já ocupados (início e fim, em minutos do dia) de hoje em diante.
+ * O navegador cruza isso com a duração do atendimento montado; o POST valida de novo.
+ */
 export async function GET() {
-  const [ocupados, bloqueados] = await Promise.all([
-    db
-      .select({ dia: agendamentos.dia, horario: agendamentos.horario })
-      .from(agendamentos)
-      .where(and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado"))),
-    db
-      .select({ dia: horariosBloqueados.dia, horario: horariosBloqueados.horario })
-      .from(horariosBloqueados)
-      .where(gte(horariosBloqueados.dia, hojeIso())),
-  ]);
-
-  return NextResponse.json({ ocupados: [...ocupados, ...bloqueados] });
+  const { bufferMin } = await carregarCatalogo();
+  const ocupados = await ocupacaoDaAgenda({ aPartirDe: hojeIso(), bufferMin });
+  return NextResponse.json({ ocupados, bufferMin }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const {
-    nome,
-    telefone,
-    carro,
-    placa,
-    tipoAtendimento,
-    avulsosIds,
-    planoId,
-    porteVeiculo,
-    servicoPlano,
-    dia,
-    horario,
-  } = body ?? {};
+  const body = await request.json().catch(() => null);
+  const { tipoAtendimento, telefone, dia, horario } = body ?? {};
 
   if (
-    typeof nome !== "string" || nome.trim().length < 2 ||
-    typeof telefone !== "string" || telefone.trim().length < 8 ||
-    typeof carro !== "string" || carro.trim().length < 1 ||
     (tipoAtendimento !== "avulso" && tipoAtendimento !== "assinatura") ||
-    (porteVeiculo !== "P" && porteVeiculo !== "G") ||
+    typeof telefone !== "string" || !telefoneValido(telefone) ||
     typeof dia !== "string" || !dataValidaParaAgendar(dia) ||
     typeof horario !== "string" || !horariosAgendamento.includes(horario)
   ) {
     return NextResponse.json({ erro: "Dados obrigatórios inválidos" }, { status: 400 });
   }
 
-  const porte = porteVeiculo as VehicleSize;
-  let plano = null as (typeof planos)[PlanoId] | null;
-  let servicoPlanoNome: string | null = null;
-  let preco: number | null = null;
-  let servicosAdicionaisJson: string | null = null;
-  let assinaturaId: number | null = null;
+  const catalogo = await carregarCatalogo();
+  const comum = { dia, horario, bufferMin: catalogo.bufferMin, origem: "landing" as const };
+  let resultado;
 
   if (tipoAtendimento === "avulso") {
+    const { nome, carro, placa, avulsosIds } = body;
+    // `porteVeiculo` = nome antigo do campo (página aberta antes do deploy)
+    const categoria: unknown = body.categoriaVeiculo ?? body.porteVeiculo;
+    if (
+      typeof nome !== "string" || nome.trim().length < 2 ||
+      typeof carro !== "string" || carro.trim().length < 1 ||
+      !categoriaVeiculoValida(categoria)
+    ) {
+      return NextResponse.json({ erro: "Dados obrigatórios inválidos" }, { status: 400 });
+    }
     if (!Array.isArray(avulsosIds) || avulsosIds.some((id) => typeof id !== "string")) {
       return NextResponse.json({ erro: "Adicionais inválidos" }, { status: 400 });
     }
-    const adicionais = (avulsosIds as string[]).map((id) =>
-      servicosAvulsos.find((s) => s.id === id)
-    );
+
+    // serviço base e adicionais vêm do catálogo vigente, sempre conferidos no servidor
+    const base = servicoBase(catalogo, categoria);
+    if (!base || !disponivelNoSite(base, categoria)) {
+      return NextResponse.json({ erro: "Serviço indisponível para esse veículo." }, { status: 400 });
+    }
+    const permitidos = adicionaisPara(catalogo, categoria, true);
+    const adicionais = [...new Set(avulsosIds as string[])].map((id) => permitidos.find((s) => s.id === id));
     if (adicionais.some((s) => !s)) {
       return NextResponse.json({ erro: "Adicional inválido" }, { status: 400 });
     }
     const validos = adicionais.filter((s): s is NonNullable<typeof s> => Boolean(s));
-    const totalAdicionais = validos.reduce(
-      (soma, s) => soma + (precoServico(s, porte) ?? 0),
-      0
-    );
-    preco = (precoServico(duchaPitstop, porte) ?? 0) + totalAdicionais;
-    servicosAdicionaisJson = JSON.stringify(
-      validos.map((s) => ({ id: s.id, nome: s.nome, preco: precoServico(s, porte) }))
-    );
+
+    resultado = await criarAgendamento({
+      ...comum,
+      nome,
+      telefone,
+      carro,
+      placa: typeof placa === "string" ? placa : null,
+      categoriaVeiculo: categoria,
+      tipoAtendimento,
+      servicoId: base.id,
+      servicoNome: base.nome,
+      servicosAdicionaisJson: JSON.stringify(
+        validos.map((s) => ({ id: s.id, nome: s.nome, preco: precoServico(s, categoria) }))
+      ),
+      preco:
+        (precoServico(base, categoria) ?? 0) +
+        validos.reduce((soma, s) => soma + (precoServico(s, categoria) ?? 0), 0),
+      duracaoMin: duracaoTotal([base, ...validos]),
+    });
   } else {
-    plano = planos[planoId as PlanoId] ?? null;
-    if (!plano) {
-      return NextResponse.json({ erro: "Plano inválido" }, { status: 400 });
+    // Assinante: o WhatsApp localiza o cadastro. Nome, veículo, placa, porte e plano vêm do
+    // banco, nunca do que o navegador mandar.
+    const assinante = await buscarAssinante(telefone, catalogo);
+    if (!assinante) {
+      return NextResponse.json(
+        { erro: "Não encontramos um cadastro PitPass para esse WhatsApp." },
+        { status: 400 }
+      );
     }
-    if (typeof servicoPlano !== "string" || !servicosPorPlano[plano.id].includes(servicoPlano)) {
+    const planoId = assinante.assinatura.plano as PlanoId;
+    const { servicoPlano } = body;
+    if (typeof servicoPlano !== "string" || !servicosPorPlano[planoId].includes(servicoPlano)) {
       return NextResponse.json({ erro: "Serviço do plano inválido" }, { status: 400 });
     }
-    servicoPlanoNome = servicoPlano;
-    preco = plano.precos[porte];
-
-    // Se já existe um cliente com esse telefone e uma assinatura ativa, o benefício
-    // precisa bater com o plano real dele e respeitar a cota real — nunca confiar só na UI.
-    const clienteExistente = await buscarClientePorTelefone(telefone);
-    if (clienteExistente) {
-      const [assinaturaAtiva] = await db
-        .select()
-        .from(assinaturas)
-        .where(and(eq(assinaturas.clienteId, clienteExistente.id), eq(assinaturas.status, "ativo")));
-
-      if (assinaturaAtiva) {
-        if (assinaturaAtiva.plano !== plano.id) {
-          return NextResponse.json(
-            { erro: "Esse WhatsApp já está associado a outro plano PitPass." },
-            { status: 400 }
-          );
-        }
-        const disponibilidade = await verificarBeneficioDisponivel({
-          assinaturaId: assinaturaAtiva.id,
-          plano: plano.id,
-          beneficio: servicoPlanoNome,
-          cicloInicio: assinaturaAtiva.cicloInicio,
-        });
-        if (!disponibilidade.disponivel) {
-          return NextResponse.json(
-            { erro: disponibilidade.motivo ?? "Benefício indisponível." },
-            { status: 400 }
-          );
-        }
-        assinaturaId = assinaturaAtiva.id;
-      }
+    const disponibilidade = await verificarBeneficioDisponivel({
+      assinaturaId: assinante.assinatura.id,
+      plano: planoId,
+      beneficio: servicoPlano,
+      cicloInicio: assinante.assinatura.cicloInicio,
+    });
+    if (!disponibilidade.disponivel) {
+      return NextResponse.json({ erro: disponibilidade.motivo ?? "Benefício indisponível." }, { status: 400 });
     }
-  }
 
-  const resultado = await criarAgendamento({
-    nome,
-    telefone,
-    carro,
-    placa,
-    porteVeiculo: porte,
-    tipoAtendimento,
-    dia,
-    horario,
-    planoId: plano?.id ?? null,
-    servicoPlano: servicoPlanoNome,
-    servicoId: tipoAtendimento === "avulso" ? duchaPitstop.id : null,
-    servicoNome: tipoAtendimento === "avulso" ? duchaPitstop.nome : servicoPlanoNome,
-    servicosAdicionaisJson,
-    preco,
-    origem: "landing",
-    assinaturaId,
-  });
+    const categoria: CategoriaVeiculo = assinante.publico.categoria;
+    const item = itemDoBeneficio(catalogo, servicoPlano);
+    resultado = await criarAgendamento({
+      ...comum,
+      nome: assinante.cliente.nome,
+      telefone: assinante.cliente.telefone,
+      carro: assinante.veiculo.modelo,
+      placa: assinante.veiculo.placa,
+      categoriaVeiculo: categoria,
+      tipoAtendimento,
+      planoId,
+      servicoPlano,
+      servicoId: item?.id ?? null,
+      servicoNome: servicoPlano,
+      preco: precoPlano(catalogo.planos[planoId], categoria),
+      duracaoMin: item ? duracaoTotal([item]) : null,
+      assinaturaId: assinante.assinatura.id,
+    });
+  }
 
   if (!resultado.ok) {
     return NextResponse.json({ erro: resultado.erro }, { status: resultado.status });

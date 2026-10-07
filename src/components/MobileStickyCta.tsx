@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { duchaPitstop, precoServico } from "@/lib/data";
+import { precoServico } from "@/lib/data";
+import { servicoBase } from "@/lib/catalogo";
 import { formatarPreco } from "@/lib/format";
 import { useSelection } from "@/context/SelectionContext";
 import { scrollToId } from "@/lib/scroll";
 import Bolt from "./Bolt";
 
 export default function MobileStickyCta() {
-  const { porteVeiculo, avulsosSelecionados } = useSelection();
+  const { catalogo, categoriaVeiculo: porteVeiculo, avulsosSelecionados } = useSelection();
+  const duchaPitstop = servicoBase(catalogo, porteVeiculo);
   const [visivel, setVisivel] = useState(false);
   const [dentroConfigurador, setDentroConfigurador] = useState(false);
   const [resumoAberto, setResumoAberto] = useState(false);
@@ -43,9 +45,8 @@ export default function MobileStickyCta() {
     return () => observer.disconnect();
   }, []);
 
-  const precoDucha = precoServico(duchaPitstop, porteVeiculo) ?? 0;
+  const precoDucha = duchaPitstop ? (precoServico(duchaPitstop, porteVeiculo) ?? 0) : 0;
   const totalAdicionais = avulsosSelecionados
-    .filter((s) => s.precos)
     .reduce((soma, s) => soma + (precoServico(s, porteVeiculo) ?? 0), 0);
   const total = precoDucha + totalAdicionais;
   const mostrarResumo = dentroConfigurador && avulsosSelecionados.length > 0;
@@ -60,7 +61,7 @@ export default function MobileStickyCta() {
       {mostrarResumo && resumoAberto && (
         <div className="mb-2 rounded-sm border border-white/10 bg-panel p-3 font-mono text-xs">
           <div className="flex justify-between text-text-secondary">
-            <span>Ducha Pitstop</span>
+            <span>{duchaPitstop?.nome ?? "Ducha Pitstop"}</span>
             <span className="text-white">{formatarPreco(precoDucha)}</span>
           </div>
           {avulsosSelecionados.map((s) => {

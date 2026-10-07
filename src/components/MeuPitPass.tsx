@@ -26,6 +26,11 @@ export function lembrarBuscaPitPass(dados: { telefone: string }) {
   }
 }
 
+/** WhatsApp lembrado neste aparelho (ou ""), pra pré-preencher o "Sou assinante". */
+export function whatsappLembrado(): string {
+  return lerBuscaLembrada()?.telefone ?? "";
+}
+
 function lerBuscaLembrada(): { telefone?: string } | null {
   try {
     const bruto = window.localStorage.getItem(CHAVE_LEMBRAR);

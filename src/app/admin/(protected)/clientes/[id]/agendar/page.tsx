@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, gte, ne } from "drizzle-orm";
-import { db } from "@/db/client";
-import { agendamentos, horariosBloqueados } from "@/db/schema";
 import { buscarClienteComDetalhes } from "@/lib/clientes";
+import { carregarCatalogo } from "@/lib/catalogoServidor";
+import { ocupacaoDaAgenda } from "@/lib/disponibilidade";
 import { hojeIso, proximasDatasUteis, paraIso } from "@/lib/agenda";
 import { planos, PlanoId } from "@/lib/data";
 import ClienteBadge from "@/components/admin/ClienteBadge";
@@ -18,19 +17,9 @@ export default async function AgendarPage({ params, searchParams }: PageProps<"/
   const dados = Number.isFinite(clienteId) ? await buscarClienteComDetalhes(clienteId) : null;
   if (!dados) notFound();
 
-  // mesma disponibilidade da landing: ocupados + bloqueados, de hoje em diante
-  const [ocupados, bloqueados] = await Promise.all([
-    db
-      .select({ dia: agendamentos.dia, horario: agendamentos.horario })
-      .from(agendamentos)
-      .where(and(gte(agendamentos.dia, hojeIso()), ne(agendamentos.status, "cancelado"))),
-    db
-      .select({ dia: horariosBloqueados.dia, horario: horariosBloqueados.horario })
-      .from(horariosBloqueados)
-      .where(gte(horariosBloqueados.dia, hojeIso())),
-  ]);
-
-  const chavesOcupadas = [...ocupados, ...bloqueados].map((o) => `${o.dia}-${o.horario}`);
+  // mesma disponibilidade da landing: intervalos ocupados + bloqueios, de hoje em diante
+  const catalogo = await carregarCatalogo();
+  const ocupacao = await ocupacaoDaAgenda({ aPartirDe: hojeIso(), bufferMin: catalogo.bufferMin });
   const datasIso = proximasDatasUteis(6).map((d) => paraIso(d));
   const nomePlanoAtivo = dados.assinaturaAtiva ? (planos[dados.assinaturaAtiva.plano as PlanoId]?.nome ?? null) : null;
   // veículo principal primeiro
@@ -66,7 +55,8 @@ export default async function AgendarPage({ params, searchParams }: PageProps<"/
         assinaturaAtiva={dados.assinaturaAtiva}
         nomePlanoAtivo={nomePlanoAtivo}
         datasIso={datasIso}
-        chavesOcupadas={chavesOcupadas}
+        ocupacao={ocupacao}
+        catalogo={catalogo}
         encaixe={contexto.encaixe}
         diaInicial={contexto.dia}
         horaInicial={contexto.hora}

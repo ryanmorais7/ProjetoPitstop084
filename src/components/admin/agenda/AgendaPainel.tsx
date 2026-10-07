@@ -13,6 +13,7 @@ import {
   tipoMovimento,
   TipoMovimento,
 } from "@/lib/operacao";
+import { horarioDosMinutos, intervaloOcupado, minutosDoHorario } from "@/lib/agenda";
 import { moverEstagioAgendamento, bloquearHorario, desbloquearHorario } from "@/app/admin/actions";
 import { useAviso } from "../AdminShell";
 import FormComAviso, { BotaoEnviar } from "../FormComAviso";
@@ -21,7 +22,7 @@ import CartaoKanban from "./CartaoKanban";
 import DrawerAtendimento from "./DrawerAtendimento";
 
 type Visao = "kanban" | "horarios";
-type FiltroTipo = "todos" | "avulso" | "pitpass" | "black" | "gold" | "diamante";
+type FiltroTipo = "todos" | "avulso" | "pitpass" | "black" | "gold" | "diamante" | "moto";
 type FiltroServico = "todos" | Setor;
 
 const CHAVE_VISAO = "pitstop084:agenda-visao";
@@ -33,6 +34,7 @@ const filtrosTipo: { id: FiltroTipo; rotulo: string }[] = [
   { id: "black", rotulo: "Black" },
   { id: "gold", rotulo: "Gold" },
   { id: "diamante", rotulo: "Diamante" },
+  { id: "moto", rotulo: "Moto" },
 ];
 
 const filtrosServico: { id: FiltroServico; rotulo: string }[] = [
@@ -81,6 +83,7 @@ export default function AgendaPainel({
   diaSeguinte,
   horarios,
   bloqueios,
+  bufferMin,
   agoraServidor,
 }: {
   cartoes: CartaoAgenda[];
@@ -91,6 +94,8 @@ export default function AgendaPainel({
   diaSeguinte: string;
   horarios: string[];
   bloqueios: Bloqueio[];
+  /** Buffer vigente da agenda, pra mostrar até quando cada atendimento ocupa. */
+  bufferMin: number;
   /** Relógio do servidor no render: evita divergência de hidratação nos tempos. */
   agoraServidor: number;
 }) {
@@ -159,6 +164,7 @@ export default function AgendaPainel({
       if (tipo === "avulso" && c.nomePlano) return false;
       if (tipo === "pitpass" && !c.nomePlano) return false;
       if ((tipo === "black" || tipo === "gold" || tipo === "diamante") && c.nomePlano?.toLowerCase() !== tipo) return false;
+      if (tipo === "moto" && !c.ehMoto) return false;
       if (servico !== "todos" && c.setor !== servico) return false;
       if (!termo) return true;
       return (
@@ -466,6 +472,7 @@ export default function AgendaPainel({
           horaAgora={horaAgora}
           horarios={horarios}
           bloqueios={bloqueios}
+          bufferMin={bufferMin}
           cartoes={visiveis}
           todos={cartoes}
           onAbrir={setAbertoId}
@@ -657,10 +664,12 @@ function VisaoHorarios({
   horaAgora,
   horarios,
   bloqueios,
+  bufferMin,
   cartoes,
   todos,
   onAbrir,
 }: {
+  bufferMin: number;
   dia: string;
   hoje: string;
   horaAgora: string;
@@ -675,6 +684,10 @@ function VisaoHorarios({
   // grade fixa + horários fora dela (encaixes), em ordem
   const linhas = [...new Set([...horarios, ...todos.map((c) => c.horario)])].sort();
   const bloqueioPorHorario = new Map(bloqueios.map((b) => [b.horario, b]));
+  // cada atendimento da grade ocupa do início até início + duração (+ buffer), não só a hora inicial
+  const ocupacoes = todos
+    .filter((c) => horarios.includes(c.horario))
+    .map((c) => ({ cartao: c, ...intervaloOcupado(c.horario, c.duracaoAgenda, bufferMin) }));
 
   return (
     <ol className="adm-card mt-4 divide-y divide-adm-line overflow-hidden">
@@ -684,6 +697,9 @@ function VisaoHorarios({
         const bloqueio = bloqueioPorHorario.get(hora);
         const jaPassou = dia < hoje || (dia === hoje && hora <= horaAgora);
         const encaixe = !horarios.includes(hora);
+        const minuto = minutosDoHorario(hora);
+        // horário coberto por um atendimento que começou antes: não pode receber outro
+        const emUso = ocupantes.length === 0 ? ocupacoes.find((o) => minuto > o.inicio && minuto < o.fim) : undefined;
 
         return (
           <li key={hora} className={`flex gap-4 px-4 py-4 sm:px-5 ${bloqueio ? "bg-black/[0.03]" : ""}`}>
@@ -710,9 +726,21 @@ function VisaoHorarios({
                       {encaixe && <span className="adm-chip adm-status-confirmado">Encaixe</span>}
                       {c.exigeDetailer && <span className="adm-chip adm-status-confirmado">Detailer</span>}
                       <span className="font-mono text-[11px] text-adm-muted">{c.codigo}</span>
+                      {c.duracaoAgenda != null && !encaixe && (
+                        <span className="font-mono text-[11px] text-adm-muted">
+                          · ocupa até {horarioDosMinutos(minuto + c.duracaoAgenda + bufferMin)}
+                        </span>
+                      )}
                     </span>
                   </button>
                 ))}
+              </div>
+            ) : emUso ? (
+              <div className="min-w-0 flex-1 border-l-2 border-gold/50 pl-4">
+                <p className="font-heading text-sm font-bold tracking-[0.12em] text-adm-muted">EM USO</p>
+                <p className="mt-0.5 text-sm text-adm-muted">
+                  {emUso.cartao.nome} ({emUso.cartao.horario}) ocupa a agenda até {horarioDosMinutos(emUso.fim)}.
+                </p>
               </div>
             ) : bloqueio ? (
               <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 border-l-2 border-black/20 pl-4">

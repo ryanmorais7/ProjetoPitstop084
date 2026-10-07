@@ -4,6 +4,7 @@ import { horariosBloqueados } from "@/db/schema";
 import { diaFechado, horariosAgendamento } from "@/lib/data";
 import { hojeIso, formatarDataCurta, agoraMs } from "@/lib/agenda";
 import { cartoesDoDia } from "@/lib/adminDados";
+import { carregarCatalogo } from "@/lib/catalogoServidor";
 import AgendaPainel from "@/components/admin/agenda/AgendaPainel";
 
 function isoValido(valor: unknown): valor is string {
@@ -29,8 +30,9 @@ export default async function AgendaPage({ searchParams }: PageProps<"/admin/age
   const hoje = hojeIso();
   const diaSelecionado = isoValido(dia) ? dia : hoje;
 
-  const [cartoes, bloqueios] = await Promise.all([
+  const [cartoes, catalogo, bloqueios] = await Promise.all([
     cartoesDoDia(diaSelecionado),
+    carregarCatalogo(),
     db
       .select({ id: horariosBloqueados.id, horario: horariosBloqueados.horario, motivo: horariosBloqueados.motivo })
       .from(horariosBloqueados)
@@ -49,6 +51,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/admin/age
       diaSeguinte={diaVizinho(diaSelecionado, 1)}
       horarios={horariosAgendamento}
       bloqueios={bloqueios}
+      bufferMin={catalogo.bufferMin}
       agoraServidor={agoraMs()}
     />
   );

@@ -1,24 +1,48 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos, clientes, veiculos, beneficioUsos, assinaturas, StatusAgendamento } from "@/db/schema";
-import { dataValidaParaAgendar, horarioValidoParaAgendar, hojeIso } from "./agenda";
-import { VehicleSize, regrasBeneficios, PlanoId } from "./data";
+import {
+  dataValidaParaAgendar,
+  horarioValidoParaAgendar,
+  hojeIso,
+  intervaloOcupado,
+  ocupaAgenda,
+  situacaoDoHorario,
+} from "./agenda";
+import { CategoriaVeiculo, regrasBeneficios, PlanoId } from "./data";
+import { digitosTelefone } from "./format";
 import { gerarTokenCheckin } from "./checkin";
+import { ocupacaoDaAgenda } from "./disponibilidade";
 import { Estagio, lerHistoricoEstagios } from "./operacao";
 
 export function normalizarTelefone(telefone: string): string {
-  return telefone.replace(/\D/g, "");
+  return digitosTelefone(telefone);
 }
 
+/**
+ * O WhatsApp localiza o cadastro. Compara só os dígitos, com ou sem o 55 na frente, pra o
+ * mesmo número nunca virar dois clientes por causa de máscara ou DDI.
+ */
 export async function buscarClientePorTelefone(telefone: string) {
   const digitos = normalizarTelefone(telefone);
   if (!digitos) return null;
   const [cliente] = await db
     .select()
     .from(clientes)
-    .where(sql`regexp_replace(${clientes.telefone}, '[^0-9]', '', 'g') = ${digitos}`)
+    .where(sql`regexp_replace(${clientes.telefone}, '[^0-9]', '', 'g') in (${digitos}, ${"55" + digitos})`)
+    .orderBy(asc(clientes.id))
     .limit(1);
   return cliente ?? null;
+}
+
+/** PitPass que identifica o assinante: o ativo, ou o cadastro feito no site aguardando conferência. */
+export async function buscarAssinaturaVigente(clienteId: number) {
+  const vigentes = await db
+    .select()
+    .from(assinaturas)
+    .where(and(eq(assinaturas.clienteId, clienteId), inArray(assinaturas.status, ["ativo", "pendente"])))
+    .orderBy(asc(assinaturas.id));
+  return vigentes.find((a) => a.status === "ativo") ?? vigentes[0] ?? null;
 }
 
 export async function buscarOuCriarCliente({
@@ -56,7 +80,8 @@ export async function buscarOuCriarVeiculo({
   clienteId: number;
   modelo: string;
   placa?: string | null;
-  porte: VehicleSize;
+  /** Porte do carro (P/G) ou "MOTO". */
+  porte: CategoriaVeiculo;
 }) {
   const placaNormalizada = placa ? placa.trim().toUpperCase() : null;
   const existentes = await db.select().from(veiculos).where(eq(veiculos.clienteId, clienteId));
@@ -201,10 +226,14 @@ export interface DadosNovoAgendamento {
   telefone: string;
   carro: string;
   placa?: string | null;
-  porteVeiculo: VehicleSize;
+  categoriaVeiculo: CategoriaVeiculo;
   tipoAtendimento: "avulso" | "assinatura";
   dia: string;
   horario: string;
+  /** Duração estimada do atendimento inteiro, do catálogo. null = algum serviço sem duração definida. */
+  duracaoMin: number | null;
+  /** Buffer vigente da agenda (catalogo.bufferMin). */
+  bufferMin: number;
   planoId?: PlanoId | null;
   servicoPlano?: string | null;
   servicoId?: string | null;
@@ -240,6 +269,25 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
     if (!dataValidaParaAgendar(dados.dia)) {
       return { ok: false, erro: "Data inválida.", status: 400 };
     }
+    if (!ocupaAgenda(dados.horario)) {
+      return { ok: false, erro: "Horário fora da agenda.", status: 400 };
+    }
+    // o atendimento precisa caber inteiro: do início até início + duração (+ buffer)
+    const ocupados = await ocupacaoDaAgenda({ soDia: dados.dia, bufferMin: dados.bufferMin });
+    const situacao = situacaoDoHorario({
+      horario: dados.horario,
+      duracaoMin: dados.duracaoMin,
+      bufferMin: dados.bufferMin,
+      ocupados,
+    });
+    if (situacao === "ocupado") return { ok: false, erro: "Horário já reservado", status: 409 };
+    if (situacao === "sem-janela") {
+      return {
+        ok: false,
+        erro: "Esse horário não comporta a duração do atendimento. Escolha outro horário.",
+        status: 409,
+      };
+    }
   }
 
   const { cliente } = await buscarOuCriarCliente({
@@ -251,15 +299,19 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
     clienteId: cliente.id,
     modelo: dados.carro,
     placa: dados.placa,
-    porte: dados.porteVeiculo,
+    porte: dados.categoriaVeiculo,
   });
 
   const checkinToken = gerarTokenCheckin();
   let registro;
   try {
-    [registro] = await db
-      .insert(agendamentos)
-      .values({
+    // A trava por dia enfileira as reservas concorrentes do mesmo dia dentro da transação:
+    // quem entra depois já enxerga quem entrou antes na conferência logo abaixo.
+    const [, inseridos] = await db.batch([
+      db.execute(sql`select pg_advisory_xact_lock(hashtext(${"agenda:" + dados.dia}))`),
+      db
+        .insert(agendamentos)
+        .values({
         clienteId: cliente.id,
         veiculoId: veiculo.id,
         nome: dados.nome.trim(),
@@ -268,9 +320,10 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
         placa: dados.placa ? dados.placa.trim().toUpperCase() : null,
         tipoAtendimento: dados.tipoAtendimento,
         plano: dados.planoId ?? null,
-        categoriaVeiculo: dados.porteVeiculo,
+        categoriaVeiculo: dados.categoriaVeiculo,
         servicoId: dados.servicoId ?? null,
         servicoNome: dados.servicoNome ?? dados.servicoPlano ?? null,
+        duracaoMin: dados.duracaoMin,
         servicosAdicionais: dados.servicosAdicionaisJson ?? null,
         preco: dados.preco != null ? dados.preco.toFixed(2) : null,
         valorOriginal: dados.valorOriginal != null ? dados.valorOriginal.toFixed(2) : null,
@@ -283,15 +336,37 @@ export async function criarAgendamento(dados: DadosNovoAgendamento): Promise<Res
         responsavelAtendimento: dados.responsavelAtendimento ?? null,
         dia: dados.dia,
         horario: dados.horario,
-        checkinToken,
-      })
-      .returning({ id: agendamentos.id });
+          checkinToken,
+        })
+        .returning({ id: agendamentos.id }),
+    ]);
+    [registro] = inseridos;
   } catch (e) {
     const mensagem = e instanceof Error ? e.message : String(e);
     if (mensagem.includes("agendamento_slot_ativo") || mensagem.includes("duplicate key")) {
       return { ok: false, erro: "Horário já reservado", status: 409 };
     }
     throw e;
+  }
+
+  // Conferência depois de gravar: se duas reservas passaram pela checagem ao mesmo tempo e os
+  // intervalos se cruzam, vale a que entrou primeiro (menor id) e esta é desfeita.
+  if (!dados.encaixe) {
+    const meu = intervaloOcupado(dados.horario, dados.duracaoMin, dados.bufferMin);
+    const anteriores = await db
+      .select({ horario: agendamentos.horario, duracaoMin: agendamentos.duracaoMin })
+      .from(agendamentos)
+      .where(
+        and(eq(agendamentos.dia, dados.dia), ne(agendamentos.status, "cancelado"), lt(agendamentos.id, registro.id))
+      );
+    const cruzou = anteriores
+      .filter((a) => ocupaAgenda(a.horario))
+      .map((a) => intervaloOcupado(a.horario, a.duracaoMin, dados.bufferMin))
+      .some((outro) => meu.inicio < outro.fim && outro.inicio < meu.fim);
+    if (cruzou) {
+      await db.delete(agendamentos).where(eq(agendamentos.id, registro.id));
+      return { ok: false, erro: "Horário já reservado", status: 409 };
+    }
   }
 
   const codigo = `P084-${String(registro.id).padStart(4, "0")}`;

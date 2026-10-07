@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { paraIso, hojeIso, horaAtualFortaleza } from "@/lib/agenda";
+import { paraIso, hojeIso, horaAtualFortaleza, SituacaoHorario } from "@/lib/agenda";
 
 const diaAbreviadoCurto = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
@@ -10,7 +10,7 @@ export default function DateTimePicker({
   dataSelecionadaIso,
   onSelecionarData,
   horarios,
-  ocupados,
+  situacao,
   horaSelecionada,
   onSelecionarHora,
   claro = false,
@@ -21,7 +21,11 @@ export default function DateTimePicker({
   dataSelecionadaIso: string | null;
   onSelecionarData: (iso: string) => void;
   horarios: string[];
-  ocupados: Set<string>;
+  /**
+   * Situação de cada horário do dia selecionado pra duração do atendimento montado:
+   * "ocupado" (já tem atendimento/bloqueio) ou "sem-janela" (começaria livre, mas não cabe).
+   */
+  situacao: (hora: string) => SituacaoHorario;
   horaSelecionada: string | null;
   onSelecionarHora: (hora: string) => void;
 }) {
@@ -86,16 +90,18 @@ export default function DateTimePicker({
       {dataSelecionadaIso && (
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
           {horarios.map((hora) => {
-            const chave = `${dataSelecionadaIso}-${hora}`;
-            const ocupado = ocupados.has(chave);
             const jaPassou = dataSelecionadaIso === hojeIso() && hora <= horaAtualFortaleza();
-            const indisponivel = ocupado || jaPassou;
+            const situacaoDaHora = jaPassou ? "livre" : situacao(hora);
+            const ocupado = situacaoDaHora === "ocupado";
+            const semJanela = situacaoDaHora === "sem-janela";
+            const indisponivel = ocupado || semJanela || jaPassou;
             const selecionado = horaSelecionada === hora;
             return (
               <button
                 key={hora}
                 type="button"
                 disabled={indisponivel}
+                title={semJanela ? "Não há tempo suficiente a partir deste horário para o atendimento escolhido." : undefined}
                 onClick={() => onSelecionarHora(hora)}
                 aria-pressed={selecionado}
                 className={`flex flex-col items-center justify-center gap-0.5 rounded-sm border px-3 py-3 font-mono text-sm transition-colors duration-200 ${
@@ -115,6 +121,7 @@ export default function DateTimePicker({
                   {hora}
                 </span>
                 {ocupado && <span className="text-[10px] uppercase tracking-wide">Ocupado</span>}
+                {semJanela && <span className="text-[10px] uppercase tracking-wide">Sem janela</span>}
               </button>
             );
           })}

@@ -39,21 +39,27 @@ export const veiculos = pgTable("veiculos", {
     .references(() => clientes.id),
   modelo: text("modelo").notNull(),
   placa: text("placa"),
-  /** "P" | "G" */
+  /** Categoria do veículo: "P" | "G" (porte do carro) ou "MOTO" (moto não tem porte). */
   porte: text("porte").notNull(),
   principal: boolean("principal").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type StatusAssinatura = "ativo" | "pausado" | "cancelado";
+/**
+ * "pendente" = cadastro PitPass feito pelo próprio cliente no site, ainda não conferido pela
+ * recepção. Já identifica o assinante pelo WhatsApp e conta cota, mas só vira "ativo" no admin.
+ */
+export type StatusAssinatura = "pendente" | "ativo" | "pausado" | "cancelado";
 
 export const assinaturas = pgTable("assinaturas", {
   id: serial("id").primaryKey(),
   clienteId: integer("cliente_id")
     .notNull()
     .references(() => clientes.id),
-  /** "black" | "gold" | "diamante" */
+  /** PlanoId: "black" | "gold" | "diamante" | "moto-black" | "moto-gold" */
   plano: text("plano").notNull(),
+  /** Veículo do PitPass. Null (assinatura antiga) = veículo principal do cliente. */
+  veiculoId: integer("veiculo_id").references(() => veiculos.id),
   status: text("status").notNull().default("ativo"),
   inicioEm: text("inicio_em").notNull(),
   cicloInicio: text("ciclo_inicio").notNull(),
@@ -100,9 +106,17 @@ export const agendamentos = pgTable(
     placa: text("placa"),
     tipoAtendimento: text("tipo_atendimento").notNull(),
     plano: text("plano"),
+    /** "P" | "G" | "MOTO" */
     categoriaVeiculo: text("categoria_veiculo"),
+    /** Id do serviço no catálogo: a Ducha (avulso) ou a lavagem do plano (assinatura). */
     servicoId: text("servico_id"),
     servicoNome: text("servico_nome"),
+    /**
+     * Duração estimada do atendimento inteiro (serviço + adicionais), em minutos, calculada do
+     * catálogo no momento do agendamento. Null = algum serviço sem duração definida (ou registro
+     * antigo): ocupa um horário da grade, como antes.
+     */
+    duracaoMin: integer("duracao_min"),
     /** JSON de [{id, nome, preco}] com os cuidados adicionais escolhidos no configurador (preco: null = mediante avaliação). */
     servicosAdicionais: text("servicos_adicionais"),
     preco: numeric("preco", { precision: 10, scale: 2 }),
@@ -165,3 +179,53 @@ export const agendamentos = pgTable(
 );
 
 export type StatusAgendamento = "confirmado" | "concluido" | "cancelado";
+
+/**
+ * Ajustes do catálogo feitos pelo admin. O catálogo em si (textos, fichas, valores padrão)
+ * continua em src/lib/data.ts; aqui fica só o que a gestão alterou. Coluna null = usa o padrão.
+ * `itemId` = id do serviço, ou "plano:<id>" pra mensalidade/ativação de um plano.
+ */
+export const catalogoConfig = pgTable("catalogo_config", {
+  itemId: text("item_id").primaryKey(),
+  nome: text("nome"),
+  categoria: text("categoria"),
+  precoP: numeric("preco_p", { precision: 10, scale: 2 }),
+  precoG: numeric("preco_g", { precision: 10, scale: 2 }),
+  precoMoto: numeric("preco_moto", { precision: 10, scale: 2 }),
+  duracaoMin: integer("duracao_min"),
+  ativo: boolean("ativo"),
+  requerAvaliacao: boolean("requer_avaliacao"),
+  requerDetailer: boolean("requer_detailer"),
+  requerLavador: boolean("requer_lavador"),
+  podeSerAdicional: boolean("pode_ser_adicional"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Configurações simples do negócio (chave/valor): buffer da agenda, dados da empresa no recibo. */
+export const configuracoes = pgTable("configuracoes", {
+  chave: text("chave").primaryKey(),
+  valor: text("valor"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Recibo/comprovante de serviço (NÃO é nota fiscal). Um por atendimento. `dados` guarda o
+ * retrato do que foi impresso, pra o recibo não mudar se o cadastro mudar depois.
+ */
+export const recibos = pgTable("recibos", {
+  id: serial("id").primaryKey(),
+  /** "R084-0001": sequência própria dos recibos, gerada depois do insert. */
+  numero: text("numero").unique(),
+  agendamentoId: integer("agendamento_id")
+    .notNull()
+    .unique()
+    .references(() => agendamentos.id),
+  clienteId: integer("cliente_id").references(() => clientes.id),
+  formaPagamento: text("forma_pagamento"),
+  observacao: text("observacao"),
+  total: numeric("total", { precision: 10, scale: 2 }),
+  /** JSON de DadosRecibo (src/lib/recibo.ts). */
+  dados: text("dados").notNull(),
+  emitidoEm: timestamp("emitido_em", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

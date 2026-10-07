@@ -2,17 +2,27 @@
 
 import { ReactNode, useActionState, useMemo, useState } from "react";
 import {
-  duchaPitstop,
-  servicosAvulsos,
+  CategoriaVeiculo,
+  categoriaVeiculoValida,
+  precoPlano,
   precoServico,
-  listaPlanos,
-  planos,
   servicosPorPlano,
   lavagensPlano,
   horariosAgendamento,
   PlanoId,
-  VehicleSize,
+  tipoDaCategoria,
 } from "@/lib/data";
+import {
+  adicionaisPara,
+  Catalogo,
+  duracaoTotal,
+  formatarDuracao,
+  itemDoBeneficio,
+  planosPara,
+  servicoBase,
+} from "@/lib/catalogo";
+import { situacaoDoHorario } from "@/lib/agenda";
+import type { Ocupacao } from "@/lib/disponibilidade";
 import { formatarPreco } from "@/lib/format";
 import DateTimePicker from "@/components/DateTimePicker";
 import { criarAgendamentoManual, NovoAtendimentoState } from "../../../../clientes/actions";
@@ -68,7 +78,8 @@ export default function NovoAtendimentoForm({
   assinaturaAtiva,
   nomePlanoAtivo,
   datasIso,
-  chavesOcupadas,
+  ocupacao,
+  catalogo,
   encaixe = false,
   diaInicial = null,
   horaInicial = null,
@@ -85,7 +96,10 @@ export default function NovoAtendimentoForm({
   assinaturaAtiva: Assinatura | null;
   nomePlanoAtivo: string | null;
   datasIso: string[];
-  chavesOcupadas: string[];
+  /** Trechos já ocupados da agenda (atendimentos com a sua duração + bloqueios). */
+  ocupacao: Ocupacao[];
+  /** Catálogo vigente: mesmos serviços, preços e durações do site. */
+  catalogo: Catalogo;
 }) {
   const [estado, formAction, pendente] = useActionState(criarAgendamentoManual, estadoInicial);
 
@@ -97,37 +111,67 @@ export default function NovoAtendimentoForm({
   const [veiculoId, setVeiculoId] = useState<number | null>(veiculoPrincipal?.id ?? null);
   const [carro, setCarro] = useState(veiculoPrincipal?.modelo ?? "");
   const [placa, setPlaca] = useState(veiculoPrincipal?.placa ?? "");
-  const [porte, setPorte] = useState<VehicleSize>((veiculoPrincipal?.porte as VehicleSize) ?? "P");
+  const categoriaDe = (valor: string | undefined): CategoriaVeiculo => (categoriaVeiculoValida(valor) ? valor : "P");
+  const [porte, setPorte] = useState<CategoriaVeiculo>(categoriaDe(veiculoPrincipal?.porte));
   const [avulsosIds, setAvulsosIds] = useState<Set<string>>(new Set());
-  const [planoId, setPlanoId] = useState<PlanoId>((assinaturaAtiva?.plano as PlanoId) ?? listaPlanos[0].id);
-  const [servicoPlano, setServicoPlano] = useState<string>(servicosPorPlano[planoId]?.[0] ?? "");
-  // slot vindo da Agenda só vale se ainda estiver livre
-  const slotInicialLivre = Boolean(diaInicial && horaInicial && !chavesOcupadas.includes(`${diaInicial}-${horaInicial}`));
+  const planosDoVeiculo = planosPara(catalogo, tipoDaCategoria(porte), false);
+  const [planoEscolhido, setPlanoEscolhido] = useState<PlanoId | null>((assinaturaAtiva?.plano as PlanoId) ?? null);
+  // sem assinatura ativa, o plano precisa ser do mesmo tipo de veículo (carro x moto)
+  const planoId: PlanoId =
+    planoEscolhido && (assinaturaAtiva || planosDoVeiculo.some((p) => p.id === planoEscolhido))
+      ? planoEscolhido
+      : planosDoVeiculo[0].id;
+  const beneficios = servicosPorPlano[planoId] ?? [];
+  const [beneficioEscolhido, setBeneficioEscolhido] = useState<string>("");
+  const servicoPlano = beneficios.includes(beneficioEscolhido) ? beneficioEscolhido : (beneficios[0] ?? "");
   const [dataSelecionadaIso, setDataSelecionadaIso] = useState<string | null>(diaInicial);
-  const [horaSelecionada, setHoraSelecionada] = useState<string | null>(slotInicialLivre ? horaInicial : null);
+  const [horaEscolhida, setHoraEscolhida] = useState<string | null>(horaInicial);
   const [transporte, setTransporte] = useState<"" | "leva_busca">("");
   const [valorAjustado, setValorAjustado] = useState("");
 
   const datasRapidas = useMemo(() => datasIso.map((iso) => new Date(iso + "T12:00:00Z")), [datasIso]);
-  const ocupados = useMemo(() => new Set(chavesOcupadas), [chavesOcupadas]);
 
-  const precoDucha = precoServico(duchaPitstop, porte) ?? 0;
-  const adicionaisEscolhidos = servicosAvulsos.filter((s) => avulsosIds.has(s.id));
-  const totalAvulsos = precoDucha + adicionaisEscolhidos.reduce((soma, s) => soma + (precoServico(s, porte) ?? 0), 0);
+  // serviço base e adicionais do veículo (Ducha Pitstop pra carro, Ducha Moto pra moto)
+  const ehMoto = porte === "MOTO";
+  const base = servicoBase(catalogo, porte);
+  const adicionaisDoVeiculo = adicionaisPara(catalogo, porte, false);
+  const precoBase = base ? precoServico(base, porte) : null;
+  const adicionaisEscolhidos = adicionaisDoVeiculo.filter((s) => avulsosIds.has(s.id));
+  const totalAvulsos = (precoBase ?? 0) + adicionaisEscolhidos.reduce((soma, s) => soma + (precoServico(s, porte) ?? 0), 0);
   const temAvaliacao = adicionaisEscolhidos.some((s) => s.requiresEvaluation);
-  const precoAssinatura = planos[planoId]?.precos[porte] ?? null;
+  const precoAssinatura = precoPlano(catalogo.planos[planoId], porte);
+
+  // duração do atendimento montado: é ela que decide em quais horários ele cabe
+  const lavagem = itemDoBeneficio(catalogo, servicoPlano);
+  const duracaoMin =
+    tipoAtendimento === "avulso"
+      ? base
+        ? duracaoTotal([base, ...adicionaisEscolhidos])
+        : null
+      : lavagem
+      ? duracaoTotal([lavagem])
+      : null;
+  const situacaoDe = (dia: string, hora: string) =>
+    situacaoDoHorario({
+      horario: hora,
+      duracaoMin,
+      bufferMin: catalogo.bufferMin,
+      ocupados: ocupacao.filter((o) => o.dia === dia),
+    });
+  // o horário escolhido (ou vindo da Agenda) só vale enquanto comportar o atendimento
+  const horaSelecionada =
+    dataSelecionadaIso && horaEscolhida && situacaoDe(dataSelecionadaIso, horaEscolhida) === "livre" ? horaEscolhida : null;
+  const setHoraSelecionada = setHoraEscolhida;
 
   function escolherVeiculo(v: Veiculo | null) {
     setVeiculoId(v?.id ?? null);
     setCarro(v?.modelo ?? "");
     setPlaca(v?.placa ?? "");
-    if (v) setPorte(v.porte as VehicleSize);
+    if (v) setPorte(categoriaDe(v.porte));
   }
 
-  function escolherPlano(id: PlanoId) {
-    setPlanoId(id);
-    setServicoPlano(servicosPorPlano[id]?.[0] ?? "");
-  }
+  const escolherPlano = setPlanoEscolhido;
+  const setServicoPlano = setBeneficioEscolhido;
 
   return (
     <form action={formAction} className="mt-4 space-y-4">
@@ -167,10 +211,11 @@ export default function NovoAtendimentoForm({
             />
           </label>
           <label className="block">
-            <span className="adm-rotulo mb-1.5 block">Porte</span>
-            <select name="porte" value={porte} onChange={(e) => setPorte(e.target.value as VehicleSize)} className="campo">
-              <option value="P">Hatch / Sedan (P)</option>
-              <option value="G">SUV / Pick-up (G)</option>
+            <span className="adm-rotulo mb-1.5 block">Tipo / porte</span>
+            <select name="porte" value={porte} onChange={(e) => setPorte(categoriaDe(e.target.value))} className="campo">
+              <option value="P">Carro · Hatch / Sedan (P)</option>
+              <option value="G">Carro · SUV / Pick-up (G)</option>
+              <option value="MOTO">Moto</option>
             </select>
           </label>
         </div>
@@ -184,7 +229,7 @@ export default function NovoAtendimentoForm({
       <Etapa numero={2} titulo="Serviço">
         <div className="flex flex-wrap gap-2">
           <Opcao ativo={tipoAtendimento === "avulso"} onClick={() => setTipoAtendimento("avulso")}>
-            Ducha + adicionais
+            {ehMoto ? "Ducha Moto + adicionais" : "Ducha + adicionais"}
           </Opcao>
           <Opcao ativo={tipoAtendimento === "assinatura"} onClick={() => setTipoAtendimento("assinatura")}>
             Benefício PitPass
@@ -194,12 +239,25 @@ export default function NovoAtendimentoForm({
         {tipoAtendimento === "avulso" ? (
           <div className="mt-4">
             <div className="flex items-center justify-between rounded-lg border border-gold bg-gold/15 px-4 py-3 text-sm font-semibold">
-              <span>Ducha Pitstop (base)</span>
-              <span className="tabular-nums">{formatarPreco(precoDucha)}</span>
+              <span>
+                {base?.nome ?? "Serviço base"} (base)
+                {base?.duracaoMin ? (
+                  <span className="ml-2 font-mono text-xs font-normal text-adm-muted">{formatarDuracao(base.duracaoMin)}</span>
+                ) : null}
+              </span>
+              <span className="tabular-nums">{precoBase != null ? formatarPreco(precoBase) : "Preço a definir"}</span>
             </div>
+            {precoBase == null && (
+              <p className="mt-2 text-xs text-adm-muted">
+                Esse serviço ainda não tem preço cadastrado em Serviços. Informe o valor cobrado em Ajustar valor.
+              </p>
+            )}
             <p className="adm-rotulo mb-2 mt-5">Adicionais</p>
+            {adicionaisDoVeiculo.length === 0 && (
+              <p className="text-sm text-adm-muted">Nenhum adicional cadastrado para esse tipo de veículo.</p>
+            )}
             <div className="grid gap-2 sm:grid-cols-2">
-              {servicosAvulsos.map((s) => {
+              {adicionaisDoVeiculo.map((s) => {
                 const selecionado = avulsosIds.has(s.id);
                 const preco = precoServico(s, porte);
                 return (
@@ -222,6 +280,9 @@ export default function NovoAtendimentoForm({
                     <span className="font-semibold leading-snug">
                       <span className="mr-2 font-mono text-adm-muted">{selecionado ? "✓" : "+"}</span>
                       {s.nome}
+                      {s.duracaoMin ? (
+                        <span className="ml-2 font-mono text-xs font-normal text-adm-muted">+ {formatarDuracao(s.duracaoMin)}</span>
+                      ) : null}
                     </span>
                     <span className="shrink-0 text-right font-mono text-xs text-adm-muted">
                       {preco != null ? formatarPreco(preco) : selecionado ? "Avaliação solicitada" : "Mediante avaliação"}
@@ -230,8 +291,8 @@ export default function NovoAtendimentoForm({
                 );
               })}
             </div>
-            {[...avulsosIds].map((id) => (
-              <input key={id} type="hidden" name="avulsosIds" value={id} />
+            {adicionaisEscolhidos.map((s) => (
+              <input key={s.id} type="hidden" name="avulsosIds" value={s.id} />
             ))}
             <div className="mt-4 flex items-baseline justify-between border-t border-adm-line pt-4">
               <span className="adm-rotulo">Total</span>
@@ -259,7 +320,7 @@ export default function NovoAtendimentoForm({
                   value={planoId}
                   onChange={(e) => escolherPlano(e.target.value as PlanoId)}
                 >
-                  {listaPlanos.map((p) => (
+                  {planosDoVeiculo.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nome}
                     </option>
@@ -270,7 +331,7 @@ export default function NovoAtendimentoForm({
             <label className="block">
               <span className="adm-rotulo mb-1.5 block">Benefício</span>
               <select name="servicoPlano" value={servicoPlano} onChange={(e) => setServicoPlano(e.target.value)} className="campo">
-                {(servicosPorPlano[planoId] ?? []).map((nome) => (
+                {beneficios.map((nome) => (
                   <option key={nome} value={nome}>
                     {nome}
                   </option>
@@ -312,11 +373,18 @@ export default function NovoAtendimentoForm({
             setHoraSelecionada(null);
           }}
           horarios={horariosAgendamento}
-          ocupados={ocupados}
+          situacao={(hora) => (dataSelecionadaIso ? situacaoDe(dataSelecionadaIso, hora) : "livre")}
           horaSelecionada={horaSelecionada}
           onSelecionarHora={setHoraSelecionada}
         />
         {!dataSelecionadaIso && <p className="mt-3 text-sm text-adm-muted">Escolha o dia para ver os horários livres.</p>}
+        <p className="mt-3 text-sm text-adm-muted">
+          {duracaoMin != null
+            ? `Duração estimada: ${formatarDuracao(duracaoMin)}${
+                catalogo.bufferMin ? ` + ${catalogo.bufferMin} min de intervalo` : ""
+              }. Só ficam livres os horários que comportam o atendimento inteiro.`
+            : "Algum serviço escolhido ainda não tem duração cadastrada: o atendimento ocupa um horário da agenda."}
+        </p>
         <input type="hidden" name="dia" value={dataSelecionadaIso ?? ""} />
         <input type="hidden" name="horario" value={horaSelecionada ?? ""} />
       </Etapa>

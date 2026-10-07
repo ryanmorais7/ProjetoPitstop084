@@ -93,7 +93,10 @@ export default function CartaoKanban({
 
       <button type="button" onClick={onAbrir} className="mt-2.5 block w-full text-left">
         <span className="block truncate font-heading text-base font-bold leading-tight">{cartao.nome}</span>
-        <span className="mt-0.5 block truncate text-sm text-adm-muted">{cartao.carro}</span>
+        <span className="mt-0.5 block truncate text-sm text-adm-muted">
+          {cartao.carro}
+          {cartao.ehMoto && <span className="ml-1.5 font-mono text-[10px] font-bold uppercase tracking-wide text-adm-ink">· Moto</span>}
+        </span>
         <span className="block font-mono text-[13px] font-medium">{cartao.placa ?? "sem placa"}</span>
         <span className="mt-2 block text-sm font-semibold leading-snug">
           {cartao.servico}

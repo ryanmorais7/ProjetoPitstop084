@@ -2,7 +2,8 @@ import { and, asc, eq, gte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agendamentos } from "@/db/schema";
 import { hojeIso } from "./agenda";
-import { PlanoId, portesVeiculo, VehicleSize } from "./data";
+import { PlanoId, planoValido, rotuloCategoriaVeiculo } from "./data";
+import { telefoneValido } from "./format";
 import { garantirTokenCheckin, urlCheckin } from "./checkin";
 
 /**
@@ -32,9 +33,7 @@ export interface PitPassPublico {
 
 /** Só dígitos; tira o 55 do Brasil se vier colado. Precisa sobrar DDD + número (10 ou 11 dígitos). */
 export function normalizarTelefoneBusca(entrada: string): string | null {
-  let digitos = entrada.replace(/\D/g, "");
-  if (digitos.length >= 12 && digitos.startsWith("55")) digitos = digitos.slice(2);
-  return digitos.length === 10 || digitos.length === 11 ? digitos : null;
+  return telefoneValido(entrada);
 }
 
 /** Valida e normaliza a entrada crua; null = WhatsApp inválido. */
@@ -85,11 +84,11 @@ export async function buscarMeusPitPass(telefone: string, origem: string): Promi
         codigo: r.codigo ?? "",
         nome: primeiroNome(r.nome),
         carro: r.carro,
-        porteNome: (portesVeiculo[r.categoriaVeiculo as VehicleSize] ?? portesVeiculo.P).nome,
+        porteNome: rotuloCategoriaVeiculo(r.categoriaVeiculo),
         dia: r.dia,
         horario: r.horario,
         tipoAtendimento: ehAssinatura ? "assinatura" : "avulso",
-        planoId: (r.plano as PlanoId | null) ?? null,
+        planoId: planoValido(r.plano) ? r.plano : null,
         beneficio: ehAssinatura ? r.servicoNome : null,
         servicos: ehAssinatura ? [] : [r.servicoNome ?? "Ducha Pitstop", ...adicionais],
         status: r.status === "concluido" ? "Concluído" : "Confirmado",

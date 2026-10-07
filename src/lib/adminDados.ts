@@ -3,7 +3,8 @@ import { db } from "@/db/client";
 import { agendamentos, assinaturas, clientes, veiculos } from "@/db/schema";
 import { hojeIso } from "./agenda";
 import { buscarClientes } from "./clientes";
-import { planos, PlanoId, linkWhatsappPara, portesVeiculo, VehicleSize } from "./data";
+import { planos, PlanoId, linkWhatsappPara, rotuloCategoriaVeiculo, tipoDaCategoria } from "./data";
+import { carregarCatalogo } from "./catalogoServidor";
 import {
   analisarServicos,
   Estagio,
@@ -37,6 +38,7 @@ export const filtrosTipo = [
   { id: "black", rotulo: "Black" },
   { id: "gold", rotulo: "Gold" },
   { id: "diamante", rotulo: "Diamante" },
+  { id: "moto", rotulo: "Moto" },
 ] as const;
 export type FiltroTipo = (typeof filtrosTipo)[number]["id"];
 
@@ -81,6 +83,7 @@ export async function listarAgendamentos({
   if (tipo === "black" || tipo === "gold" || tipo === "diamante") {
     condicoes.push(eq(agendamentos.tipoAtendimento, "assinatura"), eq(agendamentos.plano, tipo));
   }
+  if (tipo === "moto") condicoes.push(eq(agendamentos.categoriaVeiculo, "MOTO"));
 
   // passado (concluídos, cancelados, todos) vem do mais recente pro mais antigo; o resto, em ordem de chegada
   const passado = filtro === "concluidos" || filtro === "cancelados" || filtro === "todos";
@@ -226,7 +229,9 @@ export interface CartaoAgenda {
   telefone: string;
   carro: string;
   placa: string | null;
+  /** "Hatch / Sedan", "SUV / Pick-up" ou "Moto". */
   porteNome: string;
+  ehMoto: boolean;
   servico: string;
   adicionais: string[];
   /** null = cliente PitStop 084 (avulso, sem plano). */
@@ -239,6 +244,8 @@ export interface CartaoAgenda {
   /** ISO do início do serviço, pra comparar com o tempo estimado. */
   iniciadoEm: string | null;
   estimativaMin: number | null;
+  /** Duração gravada no agendamento: é a que bloqueia a agenda (null = um horário da grade). */
+  duracaoAgenda: number | null;
   exigeDetailer: boolean;
   setor: Setor;
   fluxo: Estagio[];
@@ -265,7 +272,7 @@ function lerJson<T>(json: string | null, padrao: T): T {
 
 /** Cards do dia pro Kanban e pra visão por horários (cancelados ficam de fora). */
 export async function cartoesDoDia(dia: string): Promise<CartaoAgenda[]> {
-  const registros = await agendamentosDoDia(dia);
+  const [registros, catalogo] = await Promise.all([agendamentosDoDia(dia), carregarCatalogo()]);
   const idsClientes = [...new Set(registros.map((r) => r.clienteId).filter((id): id is number => id != null))];
   const [planosAtivos, preferencias] = await Promise.all([
     planosAtivosPorCliente(idsClientes),
@@ -281,7 +288,7 @@ export async function cartoesDoDia(dia: string): Promise<CartaoAgenda[]> {
   return registros.flatMap((r) => {
     const estagio = estagioDoRegistro(r);
     if (!estagio) return [];
-    const analise = analisarServicos(r);
+    const analise = analisarServicos(r, catalogo);
     const ehAssinatura = r.tipoAtendimento === "assinatura";
     const nomePlano =
       ehAssinatura && r.plano
@@ -300,7 +307,8 @@ export async function cartoesDoDia(dia: string): Promise<CartaoAgenda[]> {
         telefone: r.telefone,
         carro: r.carro,
         placa: r.placa,
-        porteNome: (portesVeiculo[r.categoriaVeiculo as VehicleSize] ?? portesVeiculo.P).nome,
+        porteNome: rotuloCategoriaVeiculo(r.categoriaVeiculo),
+        ehMoto: tipoDaCategoria(r.categoriaVeiculo) === "moto",
         servico: ehAssinatura ? (r.servicoNome ?? "-") : (r.servicoNome ?? "Ducha Pitstop"),
         adicionais: ehAssinatura ? [] : lerJson<AdicionalJson[]>(r.servicosAdicionais, []).map((a) => a.nome),
         nomePlano,
@@ -309,6 +317,7 @@ export async function cartoesDoDia(dia: string): Promise<CartaoAgenda[]> {
         estagioDesde: r.estagioDesde ? new Date(r.estagioDesde).toISOString() : null,
         iniciadoEm: r.startedAt ? new Date(r.startedAt).toISOString() : null,
         estimativaMin: analise.estimativaMin,
+        duracaoAgenda: r.duracaoMin,
         exigeDetailer: analise.exigeDetailer,
         setor: analise.setor,
         fluxo: analise.fluxo,

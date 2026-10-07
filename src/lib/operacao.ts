@@ -1,4 +1,5 @@
-import { duchaPitstop, servicosAvulsos } from "./data";
+import { Catalogo, catalogoPadrao, duracaoTotal, ItemCatalogo, itemDoBeneficio, itemPorId, servicoBase } from "./catalogo";
+import { categoriaVeiculoValida } from "./data";
 
 /**
  * Fluxo operacional do carro dentro da loja (Kanban da Agenda). Helpers puros, sem banco:
@@ -33,6 +34,10 @@ interface ServicosDoRegistro {
   tipoAtendimento: string;
   servicoNome: string | null;
   servicosAdicionais: string | null;
+  servicoId?: string | null;
+  categoriaVeiculo?: string | null;
+  /** Duração gravada no agendamento (vale mais que recalcular pelo catálogo de hoje). */
+  duracaoMin?: number | null;
 }
 
 export interface AnaliseServicos {
@@ -46,28 +51,31 @@ export interface AnaliseServicos {
   estimativaMin: number | null;
 }
 
-export function analisarServicos(registro: ServicosDoRegistro): AnaliseServicos {
-  let exigeDetailer = false;
-  let estimativaMin: number | null = null;
-
-  if (registro.tipoAtendimento === "avulso") {
-    let ids: string[] = [];
-    try {
-      ids = registro.servicosAdicionais
-        ? (JSON.parse(registro.servicosAdicionais) as { id: string }[]).map((a) => a.id)
-        : [];
-    } catch {
-      // JSON antigo mal formado: trata como Ducha simples
-    }
-    const adicionais = ids.map((id) => servicosAvulsos.find((s) => s.id === id));
-    exigeDetailer = adicionais.some((s) => s?.exigeDetailer);
-    const duracoes = [duchaPitstop.duracaoMin, ...adicionais.map((s) => s?.duracaoMin)];
-    estimativaMin = duracoes.every((d): d is number => typeof d === "number")
-      ? duracoes.reduce((soma, d) => soma + d, 0)
-      : null;
+/** Serviços reais do catálogo por trás de um agendamento (base + adicionais, ou a lavagem do plano). */
+export function itensDoRegistro(registro: ServicosDoRegistro, catalogo: Catalogo = catalogoPadrao): ItemCatalogo[] {
+  if (registro.tipoAtendimento !== "avulso") {
+    const lavagem = itemPorId(catalogo, registro.servicoId) ?? itemDoBeneficio(catalogo, registro.servicoNome);
+    return lavagem ? [lavagem] : [];
   }
+  let ids: string[] = [];
+  try {
+    ids = registro.servicosAdicionais
+      ? (JSON.parse(registro.servicosAdicionais) as { id: string }[]).map((a) => a.id)
+      : [];
+  } catch {
+    // JSON antigo mal formado: trata como Ducha simples
+  }
+  const categoria = categoriaVeiculoValida(registro.categoriaVeiculo) ? registro.categoriaVeiculo : "P";
+  const base = itemPorId(catalogo, registro.servicoId) ?? servicoBase(catalogo, categoria);
+  return [base, ...ids.map((id) => itemPorId(catalogo, id))].filter((i): i is ItemCatalogo => Boolean(i));
+}
 
-  const setor: Setor = exigeDetailer ? "detail" : registro.servicoNome === "Manutenção" ? "manutencao" : "lavagem";
+export function analisarServicos(registro: ServicosDoRegistro, catalogo: Catalogo = catalogoPadrao): AnaliseServicos {
+  const itens = itensDoRegistro(registro, catalogo);
+  const exigeDetailer = itens.some((i) => i.exigeDetailer);
+  const estimativaMin = registro.duracaoMin ?? duracaoTotal(itens);
+
+  const setor: Setor = exigeDetailer ? "detail" : itens.some((i) => i.tipo === "manutencao") ? "manutencao" : "lavagem";
   // todo avulso começa pela Ducha; com serviço técnico, segue pro detailer depois da lavagem
   const servico: Estagio[] = exigeDetailer ? ["lavagem", "detail"] : ["lavagem"];
   return { exigeDetailer, setor, fluxo: ["agendado", "chegou", ...servico, "finalizacao", "pronto", "entregue"], estimativaMin };

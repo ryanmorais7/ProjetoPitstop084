@@ -1,6 +1,7 @@
 "use client";
 
 import { Servico } from "@/lib/data";
+import { formatarDuracao } from "@/lib/catalogo";
 import Preco from "./Preco";
 
 /**
@@ -44,6 +45,12 @@ export default function AddonOptionCard({
             {servico.shortDescription}
           </span>
         )}
+        {/* duração só aparece quando a operação já definiu o tempo do serviço */}
+        {servico.duracaoMin ? (
+          <span className="mt-2 block font-mono text-[10px] uppercase tracking-widest text-text-secondary">
+            + {formatarDuracao(servico.duracaoMin)}
+          </span>
+        ) : null}
         <span className="mt-auto flex items-end justify-between gap-3 pt-4">
           <span key={`${servico.id}-${preco ?? "avaliacao"}`} className="preco-fade">
             {preco != null ? (

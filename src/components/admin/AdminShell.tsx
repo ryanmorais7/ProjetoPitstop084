@@ -18,6 +18,7 @@ const itens = [
 function tituloDaRota(caminho: string): string {
   if (caminho === "/admin") return "Visão Geral";
   if (caminho.startsWith("/admin/agendamentos/novo")) return "Novo agendamento";
+  if (/^\/admin\/atendimentos\/\d+\/recibo/.test(caminho)) return "Recibo de serviço";
   if (caminho.startsWith("/admin/atendimentos")) return "Ficha do atendimento";
   if (caminho.startsWith("/admin/busca")) return "Busca";
   if (caminho.startsWith("/admin/clientes/novo")) return "Novo cliente";
@@ -123,7 +124,7 @@ export default function AdminShell({ children, sair }: { children: ReactNode; sa
   return (
     <AvisoContext.Provider value={avisar}>
       <div className="admin lg:flex">
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-adm-line bg-white lg:block">
+        <aside className="nao-imprimir sticky top-0 hidden h-screen w-60 shrink-0 border-r border-adm-line bg-white lg:block">
           <Navegacao caminho={caminho} sair={sair} />
         </aside>
 
@@ -143,7 +144,7 @@ export default function AdminShell({ children, sair }: { children: ReactNode; sa
         )}
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-adm-line bg-white/95 px-4 backdrop-blur lg:px-8">
+          <header className="nao-imprimir sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-adm-line bg-white/95 px-4 backdrop-blur lg:px-8">
             <button
               type="button"
               onClick={() => setMenuAberto(true)}
@@ -186,7 +187,7 @@ export default function AdminShell({ children, sair }: { children: ReactNode; sa
           </main>
         </div>
 
-        <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-5 z-[60] flex justify-center px-4">
+        <div aria-live="polite" className="nao-imprimir pointer-events-none fixed inset-x-0 bottom-5 z-[60] flex justify-center px-4">
           {aviso && (
             <p
               key={aviso.id}

@@ -13,6 +13,21 @@ export function formatarPrecoPartes(valor: number): { moeda: string; valor: stri
   return { moeda: match[1].trim(), valor: match[2] };
 }
 
+/**
+ * WhatsApp só em dígitos, sem o 55 do Brasil se vier colado: "(84) 9 8888-7777" e
+ * "+55 84 98888-7777" viram o mesmo "84988887777". É a chave que localiza o cadastro.
+ */
+export function digitosTelefone(entrada: string): string {
+  const digitos = entrada.replace(/\D/g, "");
+  return digitos.length >= 12 && digitos.startsWith("55") ? digitos.slice(2) : digitos;
+}
+
+/** DDD + número (10 ou 11 dígitos), ou null se não for um WhatsApp válido. */
+export function telefoneValido(entrada: string): string | null {
+  const digitos = digitosTelefone(entrada);
+  return digitos.length === 10 || digitos.length === 11 ? digitos : null;
+}
+
 export function formatarTelefone(valor: string): string {
   const digitos = valor.replace(/\D/g, "").slice(0, 11);
   if (digitos.length === 0) return "";

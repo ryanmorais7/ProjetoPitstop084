@@ -71,7 +71,7 @@ export default async function NovoClientePage({ searchParams }: PageProps<"/admi
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="adm-rotulo mb-1.5 block">Veículo *</span>
-            <input required name="modelo" className="campo" placeholder="Modelo do carro" />
+            <input required name="modelo" className="campo" placeholder="Modelo do carro ou da moto" />
           </label>
           <label className="block">
             <span className="adm-rotulo mb-1.5 block">Placa</span>
@@ -80,10 +80,11 @@ export default async function NovoClientePage({ searchParams }: PageProps<"/admi
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="adm-rotulo mb-1.5 block">Porte</span>
+            <span className="adm-rotulo mb-1.5 block">Tipo / porte</span>
             <select name="porte" className="campo" defaultValue="P">
-              <option value="P">Hatch / Sedan (P)</option>
-              <option value="G">SUV / Pick-up (G)</option>
+              <option value="P">Carro · Hatch / Sedan (P)</option>
+              <option value="G">Carro · SUV / Pick-up (G)</option>
+              <option value="MOTO">Moto</option>
             </select>
           </label>
           <label className="block">

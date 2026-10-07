@@ -640,3 +640,33 @@ body {
     display: none;
   }
 }
+
+/* Impressão (recibo do admin): só o documento, em fundo branco, sem menu nem botões. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  html,
+  body,
+  .admin {
+    background: #fff !important;
+  }
+
+  .nao-imprimir {
+    display: none !important;
+  }
+
+  .admin main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .recibo-folha {
+    max-width: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}

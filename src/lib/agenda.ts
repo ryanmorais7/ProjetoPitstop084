@@ -1,4 +1,4 @@
-import { diaFechado } from "./data";
+import { diaFechado, horariosAgendamento } from "./data";
 
 const TIMEZONE = "America/Fortaleza";
 
@@ -91,6 +91,74 @@ export function formatarDataCurta(dataIso: string): string {
   return `${diaAbreviadoCurto[data.getUTCDay()]} • ${data.getUTCDate()} ${mesAbreviado[data.getUTCMonth()]}`;
 }
 
+/**
+ * Disponibilidade por INTERVALO. Um atendimento ocupa de `horario` até `horario + duração +
+ * buffer`, não só o horário inicial. Funções puras: o navegador usa pra desenhar os horários e
+ * o servidor usa as mesmas pra validar (a validação que vale é a do servidor).
+ */
+
+/** Atendimento sem duração definida ocupa um horário da grade, como era antes dos intervalos. */
+export const DURACAO_SEM_DEFINICAO_MIN = 60;
+
+export function minutosDoHorario(horario: string): number {
+  const [h, m] = horario.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export function horarioDosMinutos(minutos: number): string {
+  return `${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`;
+}
+
+export interface Intervalo {
+  inicio: number;
+  fim: number;
+}
+
+/** Minutos do dia que um atendimento bloqueia. `bufferMin` = organização/movimentação depois dele. */
+export function intervaloOcupado(horario: string, duracaoMin: number | null | undefined, bufferMin = 0): Intervalo {
+  const inicio = minutosDoHorario(horario);
+  return { inicio, fim: inicio + (duracaoMin && duracaoMin > 0 ? duracaoMin : DURACAO_SEM_DEFINICAO_MIN) + bufferMin };
+}
+
+/** Fim do expediente = fim do último horário da grade. */
+export function fimDoExpediente(horarios: string[] = horariosAgendamento): number {
+  return Math.max(...horarios.map(minutosDoHorario)) + DURACAO_SEM_DEFINICAO_MIN;
+}
+
+/** Só quem começa num horário da grade ocupa a agenda; encaixe (hora quebrada) não bloqueia reserva. */
+export function ocupaAgenda(horario: string, horarios: string[] = horariosAgendamento): boolean {
+  return horarios.includes(horario);
+}
+
+export type SituacaoHorario = "livre" | "ocupado" | "sem-janela";
+
+/**
+ * - "ocupado": o horário inicial cai dentro de um atendimento ou bloqueio;
+ * - "sem-janela": o início está livre, mas a duração bate em outro atendimento/bloqueio ou
+ *   passa do fim do expediente;
+ * - "livre": cabe inteiro.
+ */
+export function situacaoDoHorario({
+  horario,
+  duracaoMin,
+  bufferMin = 0,
+  ocupados,
+  horarios = horariosAgendamento,
+}: {
+  horario: string;
+  duracaoMin: number | null | undefined;
+  bufferMin?: number;
+  /** Intervalos já ocupados NAQUELE dia (atendimentos + bloqueios). */
+  ocupados: Intervalo[];
+  horarios?: string[];
+}): SituacaoHorario {
+  const novo = intervaloOcupado(horario, duracaoMin, bufferMin);
+  if (ocupados.some((o) => novo.inicio >= o.inicio && novo.inicio < o.fim)) return "ocupado";
+  if (ocupados.some((o) => novo.inicio < o.fim && o.inicio < novo.fim)) return "sem-janela";
+  // o buffer é tempo interno da loja: só o serviço em si precisa terminar dentro do expediente
+  if (novo.fim - bufferMin > fimDoExpediente(horarios)) return "sem-janela";
+  return "livre";
+}
 
 /** Instante atual em ms. O servidor entrega isso ao quadro da Agenda pra hidratar os cronômetros sem divergência. */
 export function agoraMs(): number {

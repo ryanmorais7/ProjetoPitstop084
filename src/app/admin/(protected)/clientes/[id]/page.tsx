@@ -4,7 +4,18 @@ import { notFound } from "next/navigation";
 import { buscarClienteComDetalhes } from "@/lib/clientes";
 import { resumoBeneficiosAssinatura } from "@/lib/bookings";
 import { formatarDataCurta, hojeIso } from "@/lib/agenda";
-import { planos, PlanoId, listaPlanos, linkWhatsappPara, origensCliente, portesVeiculo, VehicleSize } from "@/lib/data";
+import {
+  planos,
+  PlanoId,
+  planoValido,
+  todosOsPlanos,
+  linkWhatsappPara,
+  origensCliente,
+  rotuloCategoriaVeiculo,
+  tipoDaCategoria,
+} from "@/lib/data";
+import { formatarPreco } from "@/lib/format";
+import { dataDoRecibo } from "@/lib/recibo";
 import { descreverServicos } from "@/lib/adminDados";
 import { statusOperacional, dataIsoFortaleza } from "@/lib/pitpass";
 import CarSparkMark from "@/components/CarSparkMark";
@@ -28,7 +39,10 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
   const dados = Number.isFinite(clienteId) ? await buscarClienteComDetalhes(clienteId) : null;
   if (!dados) notFound();
 
-  const { cliente, veiculos, assinaturaAtiva, historico, visitasConcluidas, proximoAgendamento } = dados;
+  const { cliente, veiculos, assinaturaAtiva, assinaturaPendente, recibos, historico, visitasConcluidas, proximoAgendamento } = dados;
+  const reciboPorAtendimento = new Map(recibos.map((r) => [r.agendamentoId, r]));
+  const planoPendente = assinaturaPendente && planoValido(assinaturaPendente.plano) ? planos[assinaturaPendente.plano] : null;
+  const veiculoPendente = assinaturaPendente ? veiculos.find((v) => v.id === assinaturaPendente.veiculoId) : null;
   const hoje = hojeIso();
   const nomePlano = assinaturaAtiva ? planos[assinaturaAtiva.plano as PlanoId]?.nome : null;
   const beneficios = assinaturaAtiva
@@ -75,7 +89,9 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
           <Dado rotulo="Placa">
             <span className="font-mono">{principal?.placa ?? "Não informada"}</span>
           </Dado>
-          <Dado rotulo="Porte">{principal ? (portesVeiculo[principal.porte as VehicleSize]?.nome ?? principal.porte) : "-"}</Dado>
+          <Dado rotulo={principal && tipoDaCategoria(principal.porte) === "moto" ? "Tipo" : "Porte"}>
+            {principal ? rotuloCategoriaVeiculo(principal.porte) : "-"}
+          </Dado>
         </dl>
       </header>
 
@@ -190,7 +206,34 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
           </div>
         ) : (
           <div className="adm-card p-5">
-            <p className="text-sm text-adm-muted">Cliente PitStop 084, sem PitPass ativo.</p>
+            {assinaturaPendente && planoPendente && (
+              <div className="mb-5 rounded-lg border-2 border-gold bg-[#fdf6e0] p-4">
+                <p className="adm-rotulo text-[#7a5600]">PitPass informado pelo cliente no site</p>
+                <p className="mt-1 font-heading text-lg font-bold">PitPass {planoPendente.nome}</p>
+                <p className="mt-0.5 text-sm text-adm-muted">
+                  {veiculoPendente ? `${veiculoPendente.modelo} · ${veiculoPendente.placa ?? "sem placa"} · ` : ""}
+                  cadastrado em {formatarDataCurta(assinaturaPendente.inicioEm)}. Confira o pagamento/contrato antes de
+                  confirmar. Enquanto pendente, o cliente já agenda os benefícios e eles contam na cota.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <FormComAviso
+                    action={alterarStatusAssinatura.bind(null, assinaturaPendente.id, cliente.id, "ativo")}
+                    mensagem="PitPass confirmado"
+                  >
+                    <BotaoEnviar className="adm-btn adm-btn-primario">Confirmar PitPass</BotaoEnviar>
+                  </FormComAviso>
+                  <FormComAviso
+                    action={alterarStatusAssinatura.bind(null, assinaturaPendente.id, cliente.id, "cancelado")}
+                    mensagem="Cadastro PitPass recusado"
+                  >
+                    <BotaoEnviar className="adm-btn adm-btn-perigo">Recusar</BotaoEnviar>
+                  </FormComAviso>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-adm-muted">
+              {assinaturaPendente ? "Ou ative direto outro plano:" : "Cliente PitStop 084, sem PitPass ativo."}
+            </p>
             <FormComAviso
               action={ativarAssinatura.bind(null, cliente.id)}
               mensagem="PitPass ativado"
@@ -200,12 +243,22 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
                 Plano
               </label>
               <select id="plano-ativar" name="plano" className="campo w-auto">
-                {listaPlanos.map((p) => (
+                {todosOsPlanos.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nome}
                   </option>
                 ))}
               </select>
+              {veiculos.length > 1 && (
+                <select name="veiculoId" aria-label="Veículo do plano" className="campo w-auto" defaultValue={principal?.id}>
+                  {veiculos.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.modelo} · {v.placa ?? "sem placa"}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {veiculos.length === 1 && <input type="hidden" name="veiculoId" value={veiculos[0].id} />}
               <BotaoEnviar className="adm-btn adm-btn-primario">Ativar PitPass</BotaoEnviar>
             </FormComAviso>
           </div>
@@ -260,7 +313,10 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
                     <span className="block font-mono text-[11px] text-adm-muted">{h.codigo}</span>
                     {h.observacoes && <span className="mt-0.5 block text-xs text-adm-muted">Obs.: {h.observacoes}</span>}
                   </span>
-                  <span>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {reciboPorAtendimento.get(h.id)?.numero && (
+                      <span className="adm-chip adm-status-confirmado">Recibo {reciboPorAtendimento.get(h.id)?.numero}</span>
+                    )}
                     <StatusChip status={statusOperacional(h, hoje)} />
                   </span>
                 </Link>
@@ -269,6 +325,37 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
           </ol>
         )}
       </section>
+
+      {/* Recibos emitidos */}
+      {recibos.length > 0 && (
+        <section aria-labelledby="recibos">
+          <h3 id="recibos" className="adm-rotulo mb-3">
+            Recibos emitidos · {recibos.length}
+          </h3>
+          <ul className="adm-card divide-y divide-adm-line overflow-hidden">
+            {recibos.map((r) => {
+              const atendimento = historico.find((h) => h.id === r.agendamentoId);
+              return (
+                <li key={r.id}>
+                  <Link
+                    href={`/admin/atendimentos/${r.agendamentoId}/recibo`}
+                    className="grid gap-x-4 gap-y-1 px-4 py-3.5 transition-colors hover:bg-black/[0.025] sm:grid-cols-[8rem_minmax(0,1fr)_auto] sm:items-center sm:px-5"
+                  >
+                    <span className="font-mono text-sm font-semibold">{r.numero}</span>
+                    <span className="min-w-0 text-sm">
+                      <span className="block truncate">{atendimento ? descreverServicos(atendimento) : "Atendimento"}</span>
+                      <span className="block font-mono text-[11px] text-adm-muted">
+                        {dataDoRecibo(new Date(r.emitidoEm).toISOString())} · {atendimento?.codigo} · {r.formaPagamento}
+                      </span>
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums">{r.total != null ? formatarPreco(Number(r.total)) : ""}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Veículos */}
       <section aria-labelledby="veiculos">
@@ -282,7 +369,8 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
                 <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm">
                   <span className="font-semibold">{v.modelo}</span>
                   <span className="font-mono text-adm-muted">{v.placa ?? "sem placa"}</span>
-                  <span className="text-adm-muted">{portesVeiculo[v.porte as VehicleSize]?.nome ?? v.porte}</span>
+                  <span className="text-adm-muted">{rotuloCategoriaVeiculo(v.porte)}</span>
+                  {tipoDaCategoria(v.porte) === "moto" && <span className="adm-chip adm-status-em_atendimento">Moto</span>}
                   {v.principal && <span className="adm-chip adm-status-confirmado">Principal</span>}
                 </li>
               ))}
@@ -295,9 +383,10 @@ export default async function FichaClientePage({ params }: PageProps<"/admin/cli
           >
             <input name="modelo" aria-label="Modelo" placeholder="Modelo" required className="campo" />
             <input name="placa" aria-label="Placa" placeholder="Placa" className="campo font-mono uppercase" />
-            <select name="porte" aria-label="Porte" className="campo" defaultValue="P">
-              <option value="P">Porte P</option>
-              <option value="G">Porte G</option>
+            <select name="porte" aria-label="Tipo e porte" className="campo" defaultValue="P">
+              <option value="P">Carro · Porte P</option>
+              <option value="G">Carro · Porte G</option>
+              <option value="MOTO">Moto</option>
             </select>
             <BotaoEnviar>+ Adicionar</BotaoEnviar>
           </FormComAviso>

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Plano, VehicleSize } from "@/lib/data";
+import { CategoriaVeiculo, Plano, precoPlano } from "@/lib/data";
+import { temaDoPlano } from "@/lib/pitpassTheme";
 import Bolt from "./Bolt";
 import NivelCuidado from "./NivelCuidado";
 import Preco from "./Preco";
 
+// Moto Black / Moto Gold usam o visual do nível equivalente; o que muda é o indicador MOTO.
 const estilosPorPlano: Record<
-  Plano["id"],
+  "black" | "gold" | "diamante",
   { card: string; nome: string; preco: string; cta: string; check: string }
 > = {
   black: {
@@ -44,7 +46,7 @@ export default function PlanoCard({
   destacado = false,
 }: {
   plano: Plano;
-  porteVeiculo: VehicleSize;
+  porteVeiculo: CategoriaVeiculo;
   onClick?: () => void;
   /** Abre a ficha técnica das lavagens do plano. */
   onVerInclui?: () => void;
@@ -52,8 +54,10 @@ export default function PlanoCard({
   destacado?: boolean;
 }) {
   const [verTodos, setVerTodos] = useState(false);
-  const estilo = estilosPorPlano[plano.id];
-  const preco = plano.precos[porteVeiculo];
+  const tema = temaDoPlano(plano.id);
+  const estilo = estilosPorPlano[tema === "avulso" ? "black" : tema];
+  const preco = precoPlano(plano, porteVeiculo);
+  const ehMoto = plano.tipoVeiculo === "moto";
   const textoSecundario = plano.id === "diamante" ? "text-light-text-secondary" : "text-text-secondary";
   const ocultos = plano.beneficios.length - BENEFICIOS_VISIVEIS_MOBILE;
 
@@ -62,8 +66,13 @@ export default function PlanoCard({
       id={`plano-${plano.id}`}
       className={`relative flex h-full flex-col rounded-sm p-6 ${estilo.card} ${destacado ? "destaque-plano" : ""}`}
     >
-      {(destacado || plano.badge) && (
+      {(destacado || plano.badge || ehMoto) && (
         <div className="mb-3 flex flex-wrap gap-2">
+          {ehMoto && (
+            <span className="w-fit rounded-sm border border-white/25 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary">
+              Moto
+            </span>
+          )}
           {destacado && (
             <span className="check-entra w-fit rounded-sm border border-gold px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-gold">
               ✓ Combina com você
@@ -81,7 +90,7 @@ export default function PlanoCard({
 
       <p className={`mt-6 flex flex-wrap items-baseline gap-x-1.5 ${estilo.preco}`}>
         <span key={porteVeiculo} className="valor-atualiza">
-          <Preco valor={preco} className="text-4xl" />
+          {preco != null && <Preco valor={preco} className="text-4xl" />}
         </span>
         <span className={`whitespace-nowrap font-mono text-xs ${textoSecundario}`}>/mês</span>
       </p>

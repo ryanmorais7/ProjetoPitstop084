@@ -28,6 +28,9 @@ export const pitpassTheme: Record<TemaPitPass, DefinicaoTemaPitPass> = {
 
 /** Tema a partir do plano do agendamento (null/ausente = Ducha avulsa). */
 export function temaDoPlano(plano: PlanoId | string | null | undefined): TemaPitPass {
-  if (plano === "black" || plano === "gold" || plano === "diamante") return plano;
+  // planos de moto usam a mesma identidade do nível equivalente ("moto-black", "Moto Black" → black);
+  // o que os distingue é o indicador MOTO, não uma paleta nova
+  const nivel = (plano ?? "").toLowerCase().replace(/^moto[\s-]+/, "");
+  if (nivel === "black" || nivel === "gold" || nivel === "diamante") return nivel;
   return "avulso";
 }

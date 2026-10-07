@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  listaPlanos,
-  planos,
   regraUtilizacaoPlanos,
   PlanoId,
   servicosPorPlano,
@@ -11,6 +9,7 @@ import {
   regrasBeneficios,
   formatarRegraBeneficio,
 } from "@/lib/data";
+import { planosPara } from "@/lib/catalogo";
 import { scrollToId } from "@/lib/scroll";
 import { useSelection } from "@/context/SelectionContext";
 import { VehicleSizeSelector } from "./VehicleSizeSelector";
@@ -21,7 +20,11 @@ import Bolt from "./Bolt";
 import FichaTecnicaSheet from "./FichaTecnicaSheet";
 
 export default function SubscriptionPlans() {
-  const { porteVeiculo, selecionarPlano, setTipoAtendimento } = useSelection();
+  const { catalogo, categoriaVeiculo: porteVeiculo, tipoVeiculo, selecionarPlano, setTipoAtendimento } = useSelection();
+  const planos = catalogo.planos;
+  // planos do veículo escolhido, só os ativos e com mensalidade definida
+  const listaPlanos = planosPara(catalogo, tipoVeiculo, true);
+  const ehMoto = tipoVeiculo === "moto";
   // versão muda a cada recomendação pra o realce rodar de novo mesmo se o plano for o mesmo
   const [destaque, setDestaque] = useState<{ id: PlanoId; versao: number } | null>(null);
   // ficha técnica aberta: qual lavagem, de qual plano
@@ -51,7 +54,7 @@ export default function SubscriptionPlans() {
             Planos Pitstop
           </div>
           <h2 className="max-w-xl font-heading text-3xl font-bold md:text-5xl">
-            Seu carro. Sempre em dia.
+            {ehMoto ? "Sua moto. Sempre em dia." : "Seu carro. Sempre em dia."}
           </h2>
           <p className="mt-4 max-w-xl text-text-secondary">
             Cuide do seu jeito. Agende quando precisar ou transforme o cuidado em rotina com um plano
@@ -63,11 +66,20 @@ export default function SubscriptionPlans() {
           <VehicleSizeSelector className="mt-10 max-w-xl" />
         </Reveal>
 
-        <Reveal delayMs={60}>
-          <div className="mt-8">
-            <PlanFinder onConhecer={conhecerRecomendado} onComparar={() => scrollToId("planos-grade")} />
-          </div>
-        </Reveal>
+        {/* o assistente de plano fala da rotina com o carro: não se aplica a moto */}
+        {!ehMoto && (
+          <Reveal delayMs={60}>
+            <div className="mt-8">
+              <PlanFinder onConhecer={conhecerRecomendado} onComparar={() => scrollToId("planos-grade")} />
+            </div>
+          </Reveal>
+        )}
+
+        {listaPlanos.length === 0 && (
+          <p className="mt-8 rounded-sm border border-white/10 bg-panel px-5 py-4 text-sm text-text-secondary">
+            Os planos para moto ainda estão sendo preparados. Por enquanto, agende a Ducha Moto avulsa.
+          </p>
+        )}
 
         <div id="planos-grade" className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {listaPlanos.map((plano, i) => {

@@ -1,6 +1,7 @@
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientes, veiculos, assinaturas, agendamentos, beneficioUsos } from "@/db/schema";
+import { recibosDoCliente } from "./recibos";
 
 export async function buscarClientes(query: string) {
   const termo = query.trim();
@@ -52,7 +53,7 @@ export async function buscarClienteComDetalhes(id: number) {
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, id));
   if (!cliente) return null;
 
-  const [veiculosDoCliente, assinaturaAtiva, historico] = await Promise.all([
+  const [veiculosDoCliente, assinaturaAtiva, historico, assinaturaPendente, recibos] = await Promise.all([
     db.select().from(veiculos).where(eq(veiculos.clienteId, id)),
     db
       .select()
@@ -64,6 +65,13 @@ export async function buscarClienteComDetalhes(id: number) {
       .from(agendamentos)
       .where(eq(agendamentos.clienteId, id))
       .orderBy(desc(agendamentos.dia), desc(agendamentos.horario)),
+    // PitPass cadastrado pelo próprio cliente no site, aguardando conferência da recepção
+    db
+      .select()
+      .from(assinaturas)
+      .where(and(eq(assinaturas.clienteId, id), eq(assinaturas.status, "pendente")))
+      .then((r) => r[0] ?? null),
+    recibosDoCliente(id),
   ]);
 
   const beneficios = assinaturaAtiva
@@ -79,6 +87,8 @@ export async function buscarClienteComDetalhes(id: number) {
     cliente,
     veiculos: veiculosDoCliente,
     assinaturaAtiva,
+    assinaturaPendente,
+    recibos,
     historico,
     beneficios,
     visitasConcluidas,

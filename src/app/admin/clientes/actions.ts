@@ -2,23 +2,30 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientes, assinaturas } from "@/db/schema";
+import { adicionaisPara, duracaoTotal, itemDoBeneficio, servicoBase } from "@/lib/catalogo";
+import { carregarCatalogo } from "@/lib/catalogoServidor";
 import { exigirSessaoAdmin } from "@/lib/adminAuth";
 import { hojeIso, horaAtualFortaleza } from "@/lib/agenda";
 import { lerContextoAgendar, queryContextoAgendar } from "@/lib/contextoAgendar";
 import { buscarOuCriarCliente, buscarOuCriarVeiculo, calcularCiclo, criarAgendamento } from "@/lib/bookings";
 import {
+  CategoriaVeiculo,
+  categoriaVeiculoValida,
   PlanoId,
-  planos,
+  planoValido,
+  precoPlano,
   servicosPorPlano,
-  duchaPitstop,
-  servicosAvulsos,
   precoServico,
-  VehicleSize,
   origensCliente,
 } from "@/lib/data";
+
+/** Categoria do veículo vinda de um formulário do admin: "P" | "G" | "MOTO" (padrão P). */
+function categoriaDoForm(valor: FormDataEntryValue | null): CategoriaVeiculo {
+  return categoriaVeiculoValida(valor) ? valor : "P";
+}
 
 function origemValida(valor: FormDataEntryValue | null): string | null {
   return origensCliente.find((o) => o.id === valor)?.id ?? null;
@@ -31,7 +38,7 @@ export async function criarClienteManual(formData: FormData) {
   const telefone = String(formData.get("telefone") ?? "").trim();
   const modelo = String(formData.get("modelo") ?? "").trim();
   const placa = String(formData.get("placa") ?? "").trim() || null;
-  const porte = (formData.get("porte") === "G" ? "G" : "P") as VehicleSize;
+  const porte = categoriaDoForm(formData.get("porte"));
 
   if (!nome || !telefone || !modelo) return;
 
@@ -89,7 +96,7 @@ export async function adicionarVeiculo(clienteId: number, formData: FormData) {
   await exigirSessaoAdmin();
   const modelo = String(formData.get("modelo") ?? "").trim();
   const placa = String(formData.get("placa") ?? "").trim() || null;
-  const porte = (formData.get("porte") === "G" ? "G" : "P") as VehicleSize;
+  const porte = categoriaDoForm(formData.get("porte"));
   if (!modelo) return;
 
   await buscarOuCriarVeiculo({ clienteId, modelo, placa, porte });
@@ -98,17 +105,30 @@ export async function adicionarVeiculo(clienteId: number, formData: FormData) {
 
 export async function ativarAssinatura(clienteId: number, formData: FormData) {
   await exigirSessaoAdmin();
-  const plano = formData.get("plano") as PlanoId;
-  if (!planos[plano]) return;
+  const plano = formData.get("plano");
+  if (!planoValido(plano)) return;
+  const veiculoId = Number(formData.get("veiculoId")) || null;
 
-  const hoje = new Date();
-  const inicioEm = hoje.toISOString().slice(0, 10);
+  const inicioEm = hojeIso();
   const { cicloInicio, cicloFim } = calcularCiclo(inicioEm);
 
-  await db.insert(assinaturas).values({ clienteId, plano, status: "ativo", inicioEm, cicloInicio, cicloFim });
+  // um cadastro feito pelo cliente no site (pendente) vira o PitPass ativo: não cria um segundo
+  const [pendente] = await db
+    .select()
+    .from(assinaturas)
+    .where(and(eq(assinaturas.clienteId, clienteId), eq(assinaturas.status, "pendente")));
+  if (pendente) {
+    await db
+      .update(assinaturas)
+      .set({ plano, status: "ativo", veiculoId: veiculoId ?? pendente.veiculoId, updatedAt: new Date() })
+      .where(eq(assinaturas.id, pendente.id));
+  } else {
+    await db.insert(assinaturas).values({ clienteId, plano, veiculoId, status: "ativo", inicioEm, cicloInicio, cicloFim });
+  }
   revalidatePath(`/admin/clientes/${clienteId}`);
 }
 
+/** Também confirma ("ativo") ou recusa ("cancelado") um PitPass pendente, cadastrado pelo cliente no site. */
 export async function alterarStatusAssinatura(assinaturaId: number, clienteId: number, status: "ativo" | "pausado" | "cancelado") {
   await exigirSessaoAdmin();
   await db.update(assinaturas).set({ status, updatedAt: new Date() }).where(eq(assinaturas.id, assinaturaId));
@@ -130,7 +150,7 @@ export async function criarAgendamentoManual(
   const telefone = String(formData.get("telefone") ?? "").trim();
   const carro = String(formData.get("carro") ?? "").trim();
   const placa = String(formData.get("placa") ?? "").trim() || null;
-  const porte = (formData.get("porte") === "G" ? "G" : "P") as VehicleSize;
+  const porte = categoriaDoForm(formData.get("porte"));
   const tipoAtendimento = formData.get("tipoAtendimento") === "assinatura" ? "assinatura" : "avulso";
   // encaixe: carro já na loja, sem reserva. Entra com a data e a hora de agora (fora da grade).
   const encaixe = formData.get("encaixe") === "1";
@@ -154,28 +174,40 @@ export async function criarAgendamentoManual(
   let planoId: PlanoId | null = null;
   let servicoPlano: string | null = null;
   let assinaturaId: number | null = null;
+  let duracaoMin: number | null = null;
+
+  // mesmo catálogo do site: serviço base e adicionais compatíveis com o veículo (carro ou moto)
+  const catalogo = await carregarCatalogo();
 
   if (tipoAtendimento === "avulso") {
-    const avulsosIds = formData.getAll("avulsosIds").map(String);
-    const adicionais = avulsosIds
-      .map((id) => servicosAvulsos.find((s) => s.id === id))
+    const base = servicoBase(catalogo, porte);
+    if (!base) return { erro: "Não há serviço base cadastrado para esse veículo." };
+    const permitidos = adicionaisPara(catalogo, porte, false);
+    const adicionais = [...new Set(formData.getAll("avulsosIds").map(String))]
+      .map((id) => permitidos.find((s) => s.id === id))
       .filter((s): s is NonNullable<typeof s> => Boolean(s));
-    const totalAdicionais = adicionais.reduce((soma, s) => soma + (precoServico(s, porte) ?? 0), 0);
-    preco = (precoServico(duchaPitstop, porte) ?? 0) + totalAdicionais;
-    servicoId = duchaPitstop.id;
-    servicoNome = duchaPitstop.nome;
+    const valores = [base, ...adicionais].map((s) => precoServico(s, porte));
+    // serviço ainda sem preço definido (ex.: moto): fica sem valor até a recepção ajustar
+    preco = valores.every((v) => v == null) ? null : valores.reduce<number>((soma, v) => soma + (v ?? 0), 0);
+    servicoId = base.id;
+    servicoNome = base.nome;
     servicosAdicionaisJson = JSON.stringify(
       adicionais.map((s) => ({ id: s.id, nome: s.nome, preco: precoServico(s, porte) }))
     );
+    duracaoMin = duracaoTotal([base, ...adicionais]);
   } else {
-    planoId = formData.get("planoId") as PlanoId;
+    const planoDoForm = formData.get("planoId");
     servicoPlano = String(formData.get("servicoPlano") ?? "");
-    const plano = planos[planoId];
-    if (!plano || !servicosPorPlano[planoId]?.includes(servicoPlano)) {
+    if (!planoValido(planoDoForm) || !servicosPorPlano[planoDoForm].includes(servicoPlano)) {
       return { erro: "Plano/benefício inválido." };
     }
-    preco = plano.precos[porte];
+    planoId = planoDoForm;
+    preco = precoPlano(catalogo.planos[planoId], porte);
     servicoNome = servicoPlano;
+    // o benefício referencia um serviço real do catálogo (ficha, duração, equipe)
+    const lavagem = itemDoBeneficio(catalogo, servicoPlano);
+    servicoId = lavagem?.id ?? null;
+    duracaoMin = lavagem ? duracaoTotal([lavagem]) : null;
 
     const assinaturaIdForm = formData.get("assinaturaId");
     if (assinaturaIdForm) assinaturaId = Number(assinaturaIdForm);
@@ -202,10 +234,12 @@ export async function criarAgendamentoManual(
     telefone,
     carro,
     placa,
-    porteVeiculo: porte,
+    categoriaVeiculo: porte,
     tipoAtendimento,
     dia,
     horario,
+    duracaoMin,
+    bufferMin: catalogo.bufferMin,
     planoId,
     servicoPlano,
     servicoId,

@@ -14,7 +14,29 @@ export const portesVeiculo: Record<VehicleSize, VehicleSizeInfo> = {
 
 export const listaPortesVeiculo: VehicleSizeInfo[] = Object.values(portesVeiculo);
 
-export type PlanoId = "black" | "gold" | "diamante";
+export type TipoVeiculo = "carro" | "moto";
+
+/**
+ * Classificação gravada no veículo e no agendamento: o porte do carro (P/G) ou MOTO.
+ * Moto não tem porte: tem preço, duração e serviços próprios.
+ */
+export type CategoriaVeiculo = VehicleSize | "MOTO";
+
+export function categoriaVeiculoValida(valor: unknown): valor is CategoriaVeiculo {
+  return valor === "P" || valor === "G" || valor === "MOTO";
+}
+
+export function tipoDaCategoria(categoria: string | null | undefined): TipoVeiculo {
+  return categoria === "MOTO" ? "moto" : "carro";
+}
+
+/** "Hatch / Sedan", "SUV / Pick-up" ou "Moto". Registro antigo sem categoria = porte P. */
+export function rotuloCategoriaVeiculo(categoria: string | null | undefined): string {
+  if (categoria === "MOTO") return "Moto";
+  return (portesVeiculo[categoria as VehicleSize] ?? portesVeiculo.P).nome;
+}
+
+export type PlanoId = "black" | "gold" | "diamante" | "moto-black" | "moto-gold";
 
 /** Nível de cuidado: 1 = limpar, 2 = limpar + proteger, 3 = limpar + proteger + preservar. */
 export type NivelCuidado = 1 | 2 | 3;
@@ -31,10 +53,23 @@ export interface Plano {
   nome: string;
   nivel: NivelCuidado;
   headline: string;
-  precos: Record<VehicleSize, number>;
+  tipoVeiculo: TipoVeiculo;
+  /** Mensalidade por porte (planos de carro). */
+  precos: Record<VehicleSize, number> | null;
+  /** Mensalidade do plano de moto. null = ainda não definida pela gestão (não aparece no site). */
+  precoMoto: number | null;
   beneficios: string[];
   cta: string;
   badge?: string;
+  /** false = fora do site e do agendamento público. O admin liga/desliga em Serviços. */
+  ativo?: boolean;
+  /** Pendências comerciais/operacionais deste plano. NUNCA aparece no site. */
+  aConfirmar?: string[];
+}
+
+export function precoPlano(plano: Plano, categoria: CategoriaVeiculo): number | null {
+  if (categoria === "MOTO") return plano.precoMoto;
+  return plano.precos ? plano.precos[categoria] : null;
 }
 
 /** Serviços incluídos em cada plano que podem ser agendados dentro do ciclo mensal. */
@@ -42,6 +77,8 @@ export const servicosPorPlano: Record<PlanoId, string[]> = {
   black: ["Lavagem Black"],
   gold: ["Lavagem Gold", "Manutenção"],
   diamante: ["Lavagem Diamante", "Lavagem Gold", "Manutenção"],
+  "moto-black": ["Lavagem Moto Black"],
+  "moto-gold": ["Lavagem Moto Gold"],
 };
 
 export const planos: Record<PlanoId, Plano> = {
@@ -50,7 +87,9 @@ export const planos: Record<PlanoId, Plano> = {
     nome: "Black",
     nivel: 1,
     headline: "Manutenção essencial para manter seu carro limpo e apresentável.",
+    tipoVeiculo: "carro",
     precos: { P: 149.9, G: 199.9 },
+    precoMoto: null,
     beneficios: [
       "1 lavagem semanal",
       "Atendimento prioritário",
@@ -64,7 +103,9 @@ export const planos: Record<PlanoId, Plano> = {
     nome: "Gold",
     nivel: 2,
     headline: "Limpeza e proteção adicional para conservar pintura, plásticos e acabamento.",
+    tipoVeiculo: "carro",
     precos: { P: 239.9, G: 269.9 },
+    precoMoto: null,
     beneficios: [
       "1 Lavagem Gold mensal",
       "4 Manutenções mensais",
@@ -80,7 +121,9 @@ export const planos: Record<PlanoId, Plano> = {
     nivel: 3,
     headline:
       "O tratamento mais completo da PitStop084 para quem busca conservação, acabamento e preservação superior.",
+    tipoVeiculo: "carro",
     precos: { P: 329.9, G: 389.9 },
+    precoMoto: null,
     beneficios: [
       "1 Lavagem Diamante mensal",
       "2 Lavagens Gold mensais",
@@ -92,9 +135,46 @@ export const planos: Record<PlanoId, Plano> = {
     cta: "Quero ser Diamante",
     badge: "Experiência completa",
   },
+  // Planos de moto: só dois nesta fase (sem Moto Diamante). Mensalidade e cotas ainda dependem
+  // da gestão: enquanto `precoMoto` for null, o plano não aparece no site.
+  "moto-black": {
+    id: "moto-black",
+    nome: "Moto Black",
+    nivel: 1,
+    headline: "Manutenção essencial para manter a moto limpa e bem apresentada.",
+    tipoVeiculo: "moto",
+    precos: null,
+    precoMoto: null,
+    beneficios: ["2 lavagens mensais"],
+    cta: "Quero ser Moto Black",
+    aConfirmar: ["Mensalidade", "Quantidade de lavagens por ciclo (proposta: 2 por mês)"],
+  },
+  "moto-gold": {
+    id: "moto-gold",
+    nome: "Moto Gold",
+    nivel: 2,
+    headline: "Limpeza com proteção adicional para preservar pintura, carenagens e acabamento da moto.",
+    tipoVeiculo: "moto",
+    precos: null,
+    precoMoto: null,
+    beneficios: ["1 lavagem semanal"],
+    cta: "Quero ser Moto Gold",
+    aConfirmar: [
+      "Mensalidade",
+      "Frequência (proposta: 1 lavagem por semana)",
+      "Se inclui atendimento prioritário e desconto em adicionais de moto",
+    ],
+  },
 };
 
+/** Planos de carro, na ordem da landing. */
 export const listaPlanos: Plano[] = [planos.black, planos.gold, planos.diamante];
+export const listaPlanosMoto: Plano[] = [planos["moto-black"], planos["moto-gold"]];
+export const todosOsPlanos: Plano[] = [...listaPlanos, ...listaPlanosMoto];
+
+export function planoValido(valor: unknown): valor is PlanoId {
+  return typeof valor === "string" && Object.prototype.hasOwnProperty.call(planos, valor);
+}
 
 export const regraUtilizacaoPlanos =
   "Os benefícios são válidos durante o ciclo mensal da assinatura e não acumulam para o mês seguinte.";
@@ -118,6 +198,12 @@ export const regrasBeneficios: Record<
     "Lavagem Diamante": { tipo: "ciclo", limite: 1 }, // "1 Lavagem Diamante mensal"
     "Lavagem Gold": { tipo: "ciclo", limite: 2 }, // "2 Lavagens Gold mensais"
     "Manutenção": { tipo: "semanal", limite: null }, // "Manutenção semanal ilimitada"
+  },
+  "moto-black": {
+    "Lavagem Moto Black": { tipo: "ciclo", limite: 2 }, // "2 lavagens mensais" (proposta a validar)
+  },
+  "moto-gold": {
+    "Lavagem Moto Gold": { tipo: "semanal", limite: 1 }, // "1 lavagem semanal" (proposta a validar)
   },
 };
 
@@ -144,7 +230,10 @@ export interface FichaTecnica {
   expectedResult?: string;
   /** Limitações e avisos ("Importante") que evitam promessa errada. */
   technicalNote?: string;
-  /** Tempo estimado em minutos. Só preencher com tempo confirmado pela operação. */
+  /**
+   * Duração operacional padrão, em minutos. Só preencher com tempo confirmado pela operação;
+   * o admin ajusta em Serviços sem mexer no código. Sem valor = duração ainda não definida.
+   */
   duracaoMin?: number;
   /**
    * Pontos que a operação ainda precisa confirmar. NUNCA aparece no site:
@@ -156,16 +245,23 @@ export interface FichaTecnica {
 export interface Servico extends FichaTecnica {
   categoria?: CategoriaCuidado;
   duracao?: string;
-  /** null = serviço mediante avaliação, sem preço fixo */
+  /** Preço por porte do carro. null = sem preço fixo de carro (mediante avaliação, ou serviço só de moto). */
   precos: Record<VehicleSize, number> | null;
+  /** Preço para moto. null/ausente = ainda não definido (ou serviço só de carro). */
+  precoMoto?: number | null;
+  /** Em quais veículos o serviço pode ser aplicado. Ausente = só carro. */
+  tiposVeiculo?: TipoVeiculo[];
   requiresEvaluation: boolean;
   destaque?: boolean;
   /** Serviço técnico: precisa do detailer (o Kanban manda pro fluxo EM DETAIL). */
   exigeDetailer?: boolean;
+  /** Precisa do lavador. Ausente = sim, a não ser que seja serviço só do detailer. */
+  exigeLavador?: boolean;
 }
 
-export function precoServico(servico: Servico, porte: VehicleSize): number | null {
-  return servico.precos ? servico.precos[porte] : null;
+export function precoServico(servico: Servico, categoria: CategoriaVeiculo): number | null {
+  if (categoria === "MOTO") return servico.precoMoto ?? null;
+  return servico.precos ? servico.precos[categoria] : null;
 }
 
 const notaAvaliacao = "O valor é definido após avaliação presencial do veículo.";
@@ -187,6 +283,45 @@ export const duchaPitstop: Servico = {
   precos: { P: 49.9, G: 49.9 },
   requiresEvaluation: false,
 };
+
+/**
+ * Ducha Moto: serviço base do atendimento de motocicleta. Preço e duração NÃO estão definidos:
+ * a gestão informa em Admin > Serviços, e só então a moto aparece no agendamento do site.
+ *
+ * SEGURANÇA: moto não recebe pretinho nem qualquer produto que deixe a banda de rodagem
+ * escorregadia. Nunca copiar a etapa "Pretinho nos pneus" das lavagens de carro pra cá, nem
+ * presumir que um produto automotivo serve nas superfícies da moto.
+ */
+export const duchaMoto: Servico = {
+  id: "ducha-moto",
+  nome: "Ducha Moto",
+  shortDescription: "Lavagem externa da motocicleta, com secagem detalhada.",
+  includes: [
+    "Lavagem externa da motocicleta",
+    "Tanque e carenagens",
+    "Rodas",
+    "Paralamas",
+    "Banco",
+    "Limpeza externa dos componentes acessíveis",
+    "Secagem detalhada",
+    "Retirada de água de frestas e pontos de retenção",
+    "Acabamento dos plásticos compatíveis",
+  ],
+  technicalNote:
+    "Sem desmontagem de peças. Não aplicamos pretinho nem produto que deixe a banda de rodagem dos pneus escorregadia: aderência vem antes do acabamento.",
+  aConfirmar: ["Preço", "Duração", "Etapas e produtos realmente usados em moto (lista atual é a direção técnica inicial)"],
+  precos: null,
+  precoMoto: null,
+  tiposVeiculo: ["moto"],
+  requiresEvaluation: false,
+};
+
+/**
+ * Adicionais específicos de moto (proteção de pintura/carenagem, tratamento de plásticos...).
+ * Vazio de propósito: a operação ainda vai definir. O catálogo automotivo NÃO é reaproveitado
+ * aqui automaticamente. Cada item novo entra com `tiposVeiculo: ["moto"]` e `precoMoto`.
+ */
+export const adicionaisMoto: Servico[] = [];
 
 /** Tabela oficial de serviços avulsos da Pitstop 084 — cuidados adicionais do configurador "Monte seu Pitstop". */
 export const servicosAvulsos: Servico[] = [
@@ -367,6 +502,8 @@ export const servicosAvulsos: Servico[] = [
  * `regrasBeneficios` e gravada no agendamento.
  */
 export interface LavagemPlano extends FichaTecnica {
+  /** Ausente = lavagem de carro. */
+  tiposVeiculo?: TipoVeiculo[];
   /** null = não é um nível de lavagem (Manutenção). */
   nivel: NivelCuidado | null;
   /** Nome da lavagem cujos itens esta herda ("Inclui tudo da ... +"). */
@@ -464,7 +601,62 @@ export const lavagensPlano: Record<string, LavagemPlano> = {
     diferencial:
       "Não é outra lavagem completa do plano: é a manutenção que conserva o resultado dela, sem repetir as etapas de proteção.",
   },
+  // Lavagens dos planos de moto. Conteúdo = direção técnica inicial, a validar com a operação.
+  // Sem pretinho nem produto na banda de rodagem (ver aviso em `duchaMoto`).
+  "Lavagem Moto Black": {
+    id: "lavagem-moto-black",
+    nome: "Lavagem Moto Black",
+    nivel: 1,
+    tiposVeiculo: ["moto"],
+    shortDescription: "Manutenção essencial para manter a moto limpa e bem apresentada.",
+    includes: [
+      "Lavagem externa",
+      "Tanque e carenagens",
+      "Rodas",
+      "Paralamas",
+      "Banco",
+      "Áreas externas acessíveis",
+      "Secagem detalhada",
+      "Acabamento dos plásticos compatíveis",
+      "Inspeção visual final",
+    ],
+    technicalNote:
+      "Sem desmontagem de peças. Não aplicamos pretinho nem produto que deixe a banda de rodagem dos pneus escorregadia.",
+    diferencial: "Limpar: a manutenção essencial da moto, com secagem detalhada e inspeção final.",
+    aConfirmar: ["Etapas confirmadas pela operação", "Duração"],
+  },
+  "Lavagem Moto Gold": {
+    id: "lavagem-moto-gold",
+    nome: "Lavagem Moto Gold",
+    nivel: 2,
+    tiposVeiculo: ["moto"],
+    shortDescription: "Limpeza com proteção adicional para preservar pintura, carenagens e acabamento da moto.",
+    incluiTudoDe: "Lavagem Moto Black",
+    includes: [
+      "Produto de lavagem de linha premium",
+      "Proteção de pintura e carenagens compatíveis",
+      "Proteção e acabamento dos plásticos compatíveis",
+      "Limpeza e acabamento superior das rodas",
+      "Inspeção e acabamento final premium",
+    ],
+    technicalNote:
+      "Sem desmontagem de peças. Não aplicamos pretinho nem produto que deixe a banda de rodagem dos pneus escorregadia.",
+    diferencial: "Limpar + proteger: acrescenta à Moto Black produtos de linha superior e a etapa de proteção.",
+    aConfirmar: [
+      "Quais itens realmente fazem parte do processo (lista atual é proposta)",
+      "Produtos de lavagem e de proteção usados em moto",
+      "Duração",
+    ],
+  },
 };
+
+/**
+ * Lavagens/benefícios de um plano como serviços reais do catálogo (não nomes soltos):
+ * é por aqui que agendamento, admin e recibo chegam à ficha, à duração e ao id do serviço.
+ */
+export function beneficiosDoPlano(planoId: PlanoId): LavagemPlano[] {
+  return (servicosPorPlano[planoId] ?? []).map((nome) => lavagensPlano[nome]).filter(Boolean);
+}
 
 /** Rótulos genéricos das etapas do agendamento, usados no indicador de progresso. */
 export const etapasAgendamento = ["Como agendar", "Serviço", "Horário", "Ficha técnica", "PitPass"];

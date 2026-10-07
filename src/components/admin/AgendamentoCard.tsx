@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { formatarDataCurta } from "@/lib/agenda";
 import { Agendamento, descreverServicos, whatsappDoCliente } from "@/lib/adminDados";
-import { portesVeiculo, VehicleSize } from "@/lib/data";
+import { planos, planoValido, rotuloCategoriaVeiculo } from "@/lib/data";
 import {
   formatarMinutos,
   proximidadeAgendamento,
@@ -40,7 +40,9 @@ export function ProximidadeChip({
 /** Selo do agendamento: PitPass do plano usado ali, ou cliente PitStop 084 (avulso). */
 export function nomePlanoDoAgendamento(registro: Agendamento, planoAtivoDoCliente?: string | null): string | null {
   if (registro.tipoAtendimento === "assinatura" && registro.plano) {
-    return registro.plano.charAt(0).toUpperCase() + registro.plano.slice(1);
+    return planoValido(registro.plano)
+      ? planos[registro.plano].nome
+      : registro.plano.charAt(0).toUpperCase() + registro.plano.slice(1);
   }
   return planoAtivoDoCliente ?? null;
 }
@@ -57,7 +59,7 @@ export default function AgendamentoCard({
   horaAgora: string;
 }) {
   const status = statusOperacional(registro, hoje);
-  const porte = portesVeiculo[(registro.categoriaVeiculo as VehicleSize) ?? "P"] ?? portesVeiculo.P;
+  const porteNome = rotuloCategoriaVeiculo(registro.categoriaVeiculo);
 
   return (
     <article
@@ -96,7 +98,7 @@ export default function AgendamentoCard({
             <span className="mx-1.5 text-black/25">•</span>
             <span className="font-mono text-[13px] font-medium text-adm-ink">{registro.placa ?? "sem placa"}</span>
             <span className="mx-1.5 text-black/25">•</span>
-            {porte.nome}
+            {porteNome}
           </p>
           <p className="mt-1.5 text-sm font-medium">{descreverServicos(registro)}</p>
           <p className="mt-2 font-mono text-[11px] tracking-wide text-adm-muted">{registro.codigo}</p>
