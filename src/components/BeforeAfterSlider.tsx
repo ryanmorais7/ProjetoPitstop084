@@ -1,17 +1,17 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import Image from "next/image";
+import { fotosAntesDepois, fotosEspaco } from "@/lib/data";
 import Reveal from "./Reveal";
 import Bolt from "./Bolt";
 import { scrollToId } from "@/lib/scroll";
 
-const galeria = [
-  "linear-gradient(135deg, #17181b, #0a0a0b)",
-  "linear-gradient(135deg, #1c1a10, #0a0a0b)",
-  "linear-gradient(135deg, #15161a, #0a0a0b)",
-  "linear-gradient(135deg, #1d1911, #0a0a0b)",
-];
-
+/**
+ * Resultado + espaço. O antes e depois são duas fotos do mesmo carro, no mesmo enquadramento:
+ * a de "antes" fica por cima, recortada até a posição do controle, que o cliente arrasta
+ * (ou move com as setas do teclado).
+ */
 export default function BeforeAfterSlider() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [posicao, setPosicao] = useState(50);
@@ -64,33 +64,41 @@ export default function BeforeAfterSlider() {
         </Reveal>
 
         <Reveal delayMs={100}>
+          {/* fotos verticais (3:4): largura inteira no celular, coluna central no desktop */}
           <div
             ref={containerRef}
             onPointerDown={iniciarArraste}
             onPointerMove={moverArraste}
             onPointerUp={pararArraste}
             onPointerCancel={pararArraste}
-            className="relative mt-10 aspect-[4/3] w-full touch-none select-none overflow-hidden rounded-sm border border-white/10 sm:aspect-video"
+            className="relative mx-auto mt-10 aspect-[3/4] w-full max-w-lg cursor-ew-resize touch-pan-y select-none overflow-hidden rounded-sm border border-white/10"
           >
-            {/* DEPOIS: substituir este gradiente por <Image src="/depois.jpg" ... /> quando houver foto real */}
-            <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(135deg,#17181b,#0a0a0b)]">
-              <span className="font-mono text-xs uppercase tracking-[0.3em] text-gold">Depois</span>
-            </div>
-
-            {/* ANTES: substituir este gradiente por <Image src="/antes.jpg" ... /> quando houver foto real */}
-            <div
-              className="absolute inset-0 flex items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#2a2a2c,#111214)]"
+            <Image
+              src={fotosAntesDepois.depois}
+              alt={fotosAntesDepois.altDepois}
+              fill
+              sizes="(min-width: 560px) 512px, 100vw"
+              draggable={false}
+              className="object-cover"
+            />
+            <Image
+              src={fotosAntesDepois.antes}
+              alt={fotosAntesDepois.altAntes}
+              fill
+              sizes="(min-width: 560px) 512px, 100vw"
+              draggable={false}
+              className="object-cover"
               style={{ clipPath: `inset(0 ${100 - posicao}% 0 0)` }}
-            >
-              <span className="font-mono text-xs uppercase tracking-[0.3em] text-text-secondary">
-                Antes
-              </span>
-            </div>
+            />
 
-            <div
-              className="absolute inset-y-0 w-px bg-gold"
-              style={{ left: `${posicao}%` }}
-            >
+            <span className="pointer-events-none absolute left-3 top-3 rounded-sm bg-black/70 px-2.5 py-1 font-heading text-xs font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm sm:text-sm">
+              Antes
+            </span>
+            <span className="pointer-events-none absolute right-3 top-3 rounded-sm bg-gold px-2.5 py-1 font-heading text-xs font-bold uppercase tracking-[0.18em] text-asphalt sm:text-sm">
+              Depois
+            </span>
+
+            <div className="absolute inset-y-0 w-0.5 bg-gold" style={{ left: `${posicao}%` }}>
               <span
                 role="slider"
                 tabIndex={0}
@@ -99,27 +107,32 @@ export default function BeforeAfterSlider() {
                 aria-valuemin={0}
                 aria-valuemax={100}
                 onKeyDown={aoTeclar}
-                className="absolute top-1/2 left-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-gold text-asphalt shadow-lg focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-text-primary"
+                className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-gold text-asphalt shadow-lg focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-text-primary"
               >
-                <Bolt className="h-4 w-4" />
+                <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M6 4L2 8l4 4M10 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </span>
             </div>
           </div>
+          <p className="mt-3 text-center text-sm text-text-secondary">Arraste para comparar.</p>
         </Reveal>
 
         <Reveal delayMs={120}>
-          <div className="mt-4 grid grid-cols-4 gap-2">
-            {galeria.map((fundo, i) => (
-              <div
-                key={i}
-                className="aspect-square rounded-sm"
-                style={{ background: fundo }}
-              />
+          <h3 className="mt-12 font-heading text-xl font-bold md:text-2xl">Conheça o espaço</h3>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+            {fotosEspaco.map((foto) => (
+              <div key={foto.src} className="relative aspect-[3/4] overflow-hidden rounded-sm border border-white/10">
+                <Image
+                  src={foto.src}
+                  alt={foto.alt}
+                  fill
+                  sizes="(min-width: 768px) 220px, 50vw"
+                  className="object-cover transition-transform duration-700 ease-out hover:scale-[1.03]"
+                />
+              </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-text-secondary">
-            Imagens de exemplo. Fotos reais dos resultados entram aqui em breve.
-          </p>
         </Reveal>
 
         <Reveal delayMs={160}>

@@ -50,21 +50,21 @@ export default function EnderecoSection() {
     );
   }
 
-  // Com foto: mobile = informações, fachada, mapa.
-  // Desktop = informações e mapa à esquerda, fachada (foto vertical) ocupando a coluna direita.
+  // Com foto (horizontal): mobile = informações, fachada, mapa.
+  // Desktop = informações e mapa lado a lado, e a fachada em faixa larga embaixo, com o letreiro inteiro.
   return (
     <section className="px-6 py-16 md:py-20">
-      <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-2 md:grid-rows-[auto_1fr] md:gap-x-10 md:gap-y-8">
+      <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-2 md:items-center md:gap-x-10 md:gap-y-8">
         <Reveal className="md:col-start-1 md:row-start-1">{info}</Reveal>
 
-        <Reveal delayMs={60} className="md:col-start-2 md:row-span-2 md:row-start-1">
-          <figure className="group relative h-full overflow-hidden rounded-sm border border-white/10 bg-panel">
-            <div className="relative aspect-square w-full sm:aspect-[4/3] md:aspect-auto md:h-full md:min-h-[30rem]">
+        <Reveal delayMs={60} className="md:col-span-2 md:row-start-2">
+          <figure className="group relative overflow-hidden rounded-sm border border-white/10 bg-panel">
+            <div className="relative aspect-[3/2] w-full md:aspect-[2/1]">
               <Image
                 src={fotoFachada.src}
                 alt={fotoFachada.alt}
                 fill
-                sizes="(min-width: 768px) 480px, 100vw"
+                sizes="(min-width: 1024px) 1024px, 100vw"
                 className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
                 style={{ objectPosition: fotoFachada.foco }}
               />
@@ -80,7 +80,7 @@ export default function EnderecoSection() {
           </figure>
         </Reveal>
 
-        <Reveal delayMs={100} className="md:col-start-1 md:row-start-2 md:self-end">
+        <Reveal delayMs={100} className="md:col-start-2 md:row-start-1">
           {mapa}
         </Reveal>
       </div>

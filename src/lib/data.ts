@@ -708,15 +708,34 @@ export const enderecoPitstop = {
 };
 
 /**
- * Foto REAL da fachada, pra ajudar o cliente a reconhecer a loja ao chegar. Se virar null,
+ * Foto da fachada, pra ajudar o cliente a reconhecer a loja ao chegar. Se virar null,
  * a seção de localização volta a mostrar só endereço + mapa, sem buraco nem placeholder.
- * `foco` = object-position, pra manter a placa visível no recorte.
+ * Imagem horizontal (3:2). `foco` = object-position, pra manter o letreiro visível no recorte.
  */
 export const fotoFachada: { src: string; alt: string; foco: string } | null = {
-  src: "/fachada-pitstop084.jpg",
-  alt: "Fachada da PitStop084 Premium Car Studio, com a placa preta e o portão aberto para o box de lavagem",
-  foco: "50% 40%",
+  src: "/fachada-pitstop084-v2.jpg",
+  alt: "Fachada da PitStop084 Premium Car Studio ao entardecer, com o letreiro preto iluminado e o portão do box",
+  foco: "50% 38%",
 };
+
+/**
+ * Antes e depois do controle de arrastar: duas fotos do MESMO carro, no mesmo enquadramento
+ * (verticais, 3:4). Se trocar, mantenha o par alinhado, senão o efeito "quebra" na divisória.
+ */
+export const fotosAntesDepois = {
+  antes: "/resultado-compass-antes.jpg",
+  altAntes: "Jeep Compass preto coberto de lama no box da PitStop084, antes da lavagem",
+  depois: "/resultado-compass-depois.jpg",
+  altDepois: "O mesmo Jeep Compass preto limpo e brilhando no box da PitStop084, depois da lavagem",
+};
+
+/** Fotos do espaço, na ordem em que aparecem abaixo do antes e depois (verticais, 3:4). */
+export const fotosEspaco: { src: string; alt: string }[] = [
+  { src: "/espaco-pitstop084-1.jpg", alt: "Sala de espera da PitStop084 com bancada de ferramentas e produtos" },
+  { src: "/espaco-pitstop084-2.jpg", alt: "Recepção da PitStop084 com balcão preto e o raio amarelo da marca" },
+  { src: "/espaco-pitstop084-3.jpg", alt: "Box de lavagem da PitStop084 com iluminação hexagonal no teto" },
+  { src: "/espaco-pitstop084-4.jpg", alt: "Sala de espera da PitStop084 com vista para o box de lavagem" },
+];
 
 const enderecoCompleto =`${enderecoPitstop.linha1}, ${enderecoPitstop.linha2}, ${enderecoPitstop.linha3}`;
 
