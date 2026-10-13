@@ -4,15 +4,12 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import {
   CategoriaVeiculo,
   PlanoId,
-  Servico,
   lavagensPlano,
   regrasBeneficios,
   formatarRegraBeneficio,
   listaPortesVeiculo,
   rotuloCategoriaVeiculo,
-  precoServico,
   tipoDaCategoria,
-  categoriasCuidado,
   etapasAgendamento,
   horariosAgendamento,
   linkWhatsapp,
@@ -24,22 +21,21 @@ import {
   formatarDuracao,
   itemDoBeneficio,
   planosPara,
-  recomendarAdicional,
-  servicoBase,
 } from "@/lib/catalogo";
 import { proximasDatasUteis, paraIso, formatarDataCurta, situacaoDoHorario, SituacaoHorario } from "@/lib/agenda";
 import type { Ocupacao } from "@/lib/disponibilidade";
 import type { AssinantePublico } from "@/lib/assinante";
 import { mensagemAgendamentoAvulso, mensagemAgendamentoPitPass } from "@/lib/whatsapp";
 import { formatarTelefone, telefoneValido } from "@/lib/format";
-import { useSelection, TipoAtendimento } from "@/context/SelectionContext";
+import { usePitstop, useSelection, TipoAtendimento } from "@/context/SelectionContext";
 import { scrollToId } from "@/lib/scroll";
 import DateTimePicker from "./DateTimePicker";
 import PitPass from "./PitPass";
 import Bolt from "./Bolt";
 import Preco from "./Preco";
 import { VehicleSizeSelector } from "./VehicleSizeSelector";
-import AddonOptionCard from "./AddonOptionCard";
+import ConfiguradorPitstop from "./ConfiguradorPitstop";
+import ResumoPitstop from "./ResumoPitstop";
 import FichaTecnicaSheet from "./FichaTecnicaSheet";
 import NivelCuidado from "./NivelCuidado";
 import { abrirMeuPitPass, lembrarBuscaPitPass, whatsappLembrado } from "./MeuPitPass";
@@ -47,8 +43,11 @@ import { abrirMeuPitPass, lembrarBuscaPitPass, whatsappLembrado } from "./MeuPit
 /**
  * Agendamento público.
  *
- * Ducha:      tipo → veículo → adicionais → resumo (com duração) → horário → ficha → PitPass
+ * Ducha, vindo do configurador da landing (já montado): direto em horário → ficha → PitPass
+ * Ducha, entrando direto aqui: tipo → veículo → adicionais → resumo → horário → ficha → PitPass
  * Assinante:  tipo → WhatsApp → (cadastro, só na 1ª vez) → benefício → horário → confirmação → PitPass
+ *
+ * A montagem (porte, Ducha, adicionais, preço, duração) vive em um lugar só: `usePitstop`.
  *
  * O horário só é escolhido depois que o atendimento está montado: a agenda precisa da duração
  * inteira pra saber onde ele cabe.
@@ -85,13 +84,22 @@ export default function BookingFlow() {
     motoDisponivel,
     tipoAtendimento,
     setTipoAtendimento,
-    avulsosSelecionados,
     alternarAvulso,
     planoSelecionado,
     categoriaVeiculo,
     porteDefinidoPeloUsuario,
+    pedidoDeAgendar,
     reiniciarSelecao,
   } = useSelection();
+  // Ducha + adicionais: mesma seleção, mesmos preços e mesma duração do configurador da landing
+  const pitstop = usePitstop();
+  const {
+    base,
+    adicionais: avulsosSelecionados,
+    disponiveis: adicionaisDisponiveis,
+    emAvaliacao: adicionaisAvaliacao,
+    total: totalAvulso,
+  } = pitstop;
 
   const [etapa, setEtapa] = useState<Etapa>("tipo");
   const [avisoVeiculo, setAvisoVeiculo] = useState(false);
@@ -112,9 +120,7 @@ export default function BookingFlow() {
   const [categoriaCadastro, setCategoriaCadastro] = useState<CategoriaVeiculo | null>(null);
   const [planoCadastro, setPlanoCadastro] = useState<PlanoId | null>(null);
 
-  // Ducha + adicionais
-  const [fichaAdicional, setFichaAdicional] = useState<Servico | null>(null);
-  /** Uma sugestão por agendamento: aceita ou dispensada, não volta a aparecer. */
+  /** Uma sugestão no resumo por agendamento: aceita ou dispensada, não volta a aparecer. */
   const [recomendacaoEncerrada, setRecomendacaoEncerrada] = useState(false);
 
   // agenda
@@ -140,28 +146,13 @@ export default function BookingFlow() {
   }, [etapa]);
 
   const ehAssinatura = tipoAtendimento === "assinatura";
-  const base = servicoBase(catalogo, categoriaVeiculo);
-  const adicionaisDisponiveis = useMemo(() => adicionaisPara(catalogo, categoriaVeiculo, true), [catalogo, categoriaVeiculo]);
   const itemBeneficio = itemDoBeneficio(catalogo, beneficioSelecionado);
 
-  const precoBase = base ? (precoServico(base, categoriaVeiculo) ?? 0) : 0;
-  const adicionaisAvaliacao = avulsosSelecionados.filter((s) => s.requiresEvaluation);
-  const totalAvulso =
-    precoBase + avulsosSelecionados.reduce((soma, s) => soma + (precoServico(s, categoriaVeiculo) ?? 0), 0);
+  // duração do atendimento inteiro: é ela que a agenda usa pra achar uma janela que comporte tudo
+  const duracaoMin = ehAssinatura ? (itemBeneficio ? duracaoTotal([itemBeneficio]) : null) : pitstop.duracaoMin;
 
-  // duração REAL estimada: soma das durações configuradas; null se alguma ainda não foi definida
-  const duracaoMin = ehAssinatura
-    ? itemBeneficio
-      ? duracaoTotal([itemBeneficio])
-      : null
-    : base
-    ? duracaoTotal([base, ...avulsosSelecionados])
-    : null;
-
-  const recomendacao =
-    !recomendacaoEncerrada && base
-      ? recomendarAdicional([base.id, ...avulsosSelecionados.map((s) => s.id)], adicionaisDisponiveis)
-      : null;
+  // última oferta, discreta, no resumo: a primeira recomendação ainda não escolhida
+  const recomendacao = recomendacaoEncerrada ? null : (pitstop.recomendacoes[0] ?? null);
 
   function situacaoDe(dia: string, hora: string): SituacaoHorario {
     return situacaoDoHorario({
@@ -196,6 +187,15 @@ export default function BookingFlow() {
     setEtapa(tipoAtendimento === "avulso" ? etapaDaDucha() : assinante ? "beneficio" : "whatsapp");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoAtendimento, planoSelecionado]);
+
+  // "Agendar" no configurador da landing: o Pitstop já está montado, então nada de escolher de
+  // novo o tipo nem os adicionais. Vai direto pra data e horário, com a seleção preservada.
+  useEffect(() => {
+    if (pedidoDeAgendar === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reage ao clique em "Agendar" de outra seção
+    setErro(null);
+    setEtapa("horario");
+  }, [pedidoDeAgendar]);
 
   const indiceVisivel: Record<Etapa, number> = {
     tipo: 0,
@@ -472,26 +472,26 @@ export default function BookingFlow() {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <button
                   type="button"
+                  onClick={() => escolherTipo("assinatura")}
+                  className="rounded-sm border border-white/10 bg-asphalt p-5 text-left transition-colors duration-200 hover:border-gold sm:p-6"
+                >
+                  <span className="font-heading text-xl font-bold">Sou assinante</span>
+                  <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                    Tenho PitPass e quero usar um benefício. Só preciso do meu WhatsApp.
+                  </p>
+                </button>
+                <button
+                  type="button"
                   onClick={() => escolherTipo("avulso")}
                   className="rounded-sm border border-white/10 bg-asphalt p-5 text-left transition-colors duration-200 hover:border-gold sm:p-6"
                 >
-                  <span className="font-heading text-lg font-bold">{base?.nome ?? "Ducha Pitstop"}</span>
-                  <p className="mt-2 text-sm text-text-secondary">
+                  <span className="font-heading text-xl font-bold">{base?.nome ?? "Ducha Pitstop"}</span>
+                  <p className="mt-2 text-sm leading-relaxed text-text-secondary">
                     {avulsosSelecionados.length > 0
                       ? `Sua Ducha com ${avulsosSelecionados.length} cuidado${
                           avulsosSelecionados.length > 1 ? "s" : ""
                         } que você já escolheu. Confira e marque o horário.`
                       : "Monte seu atendimento: comece pela Ducha e, se quiser, adicione outros cuidados."}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => escolherTipo("assinatura")}
-                  className="rounded-sm border border-white/10 bg-asphalt p-5 text-left transition-colors duration-200 hover:border-gold sm:p-6"
-                >
-                  <span className="font-heading text-lg font-bold">Sou assinante</span>
-                  <p className="mt-2 text-sm text-text-secondary">
-                    Tenho PitPass e quero usar um benefício. Só preciso do meu WhatsApp.
                   </p>
                 </button>
               </div>
@@ -530,35 +530,20 @@ export default function BookingFlow() {
 
           {etapa === "adicionais" && base && (
             <div>
-              <h3 className="font-heading text-xl font-bold">Quer adicionar algum cuidado?</h3>
+              <h3 className="font-heading text-2xl font-bold">Monte seu Pitstop</h3>
               <p className="mt-1 text-sm text-text-secondary">
-                A {base.nome} já está no seu atendimento. Adicione o que fizer sentido, ou siga só com ela.
+                {porteNome} ·{" "}
+                <button
+                  type="button"
+                  onClick={() => setEtapa("veiculo")}
+                  className="underline underline-offset-4 hover:text-gold"
+                >
+                  trocar veículo
+                </button>
               </p>
 
-              <div className="mt-5 flex items-center justify-between gap-3 rounded-sm border border-gold/40 bg-gold/[0.07] px-4 py-3.5">
-                <span>
-                  <span className="block font-heading text-sm font-bold text-gold">{base.nome}</span>
-                  <span className={rotuloBloco}>
-                    {porteNome}
-                    {base.duracaoMin ? ` · ${formatarDuracao(base.duracaoMin)}` : ""}
-                  </span>
-                </span>
-                <Preco valor={precoBase} className="text-lg text-gold" />
-              </div>
-
-              <p className={`mt-7 ${rotuloBloco}`}>Adicionais</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {adicionaisDisponiveis.map((servico) => (
-                  <AddonOptionCard
-                    key={servico.id}
-                    servico={servico}
-                    preco={precoServico(servico, categoriaVeiculo)}
-                    selecionado={avulsosSelecionados.some((s) => s.id === servico.id)}
-                    onToggle={() => alternarAvulso(servico)}
-                    onDetalhes={() => setFichaAdicional(servico)}
-                  />
-                ))}
-              </div>
+              {/* mesmo configurador da landing: mesma seleção, mesmos preços, mesmas ofertas */}
+              <ConfiguradorPitstop className="mt-5" />
 
               <div className="mt-6 flex gap-3">
                 <button type="button" onClick={() => setEtapa("tipo")} className={botaoVoltar}>
@@ -573,78 +558,34 @@ export default function BookingFlow() {
 
           {etapa === "resumo" && base && (
             <div>
-              <h3 className="font-heading text-xs font-bold tracking-[0.22em] text-gold">Seu Pitstop</h3>
-              <p className="mt-1.5 text-sm text-text-secondary">
+              <p className="mb-4 text-sm text-text-secondary">
                 {porteNome} ·{" "}
                 <button
                   type="button"
                   onClick={() => setEtapa("veiculo")}
-                  className="text-text-secondary underline underline-offset-4 hover:text-gold"
+                  className="underline underline-offset-4 hover:text-gold"
                 >
                   trocar veículo
                 </button>
               </p>
 
-              <ul className="mt-4 divide-y divide-white/[0.07]">
-                <LinhaResumo nome={base.nome} duracaoMin={base.duracaoMin} preco={precoBase} />
-                {avulsosSelecionados.map((s) => (
-                  <LinhaResumo
-                    key={s.id}
-                    nome={s.nome}
-                    duracaoMin={s.duracaoMin}
-                    adicional
-                    preco={precoServico(s, categoriaVeiculo)}
-                    onRemover={() => alternarAvulso(s)}
-                  />
-                ))}
-              </ul>
-
-              {/* estimativa só com todas as durações definidas: nunca uma soma pela metade */}
-              {duracaoMin != null && (
-                <div className="flex items-baseline justify-between gap-4 border-t border-white/[0.07] py-3 text-sm">
-                  <span className="text-text-secondary">Estimativa</span>
-                  <span key={duracaoMin} className="valor-atualiza font-mono text-text-primary">
-                    {formatarDuracao(duracaoMin)}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-end justify-between gap-4 border-t border-white/15 pt-5">
-                <span className="font-heading text-sm font-bold tracking-[0.18em] text-text-secondary">Total</span>
-                <span aria-live="polite">
-                  <span key={totalAvulso} className="valor-atualiza">
-                    <Preco valor={totalAvulso} className="text-4xl text-gold" />
-                  </span>
-                </span>
-              </div>
-              {adicionaisAvaliacao.length > 0 && (
-                <p className="mt-3 text-xs leading-relaxed text-text-secondary">
-                  + avaliação solicitada para {adicionaisAvaliacao.map((s) => s.nome).join(", ")}. O valor não entra
-                  no total: nossa equipe define com você.
-                </p>
-              )}
+              <ResumoPitstop />
 
               {recomendacao && (
                 <aside
                   aria-label="Complete seu cuidado"
-                  className="passo-entra mt-6 rounded-sm border border-white/10 bg-asphalt p-4 sm:p-5"
+                  className="passo-entra mt-5 rounded-md border border-white/10 bg-asphalt p-4 sm:p-5"
                 >
-                  <p className={rotuloBloco}>Complete seu cuidado</p>
-                  <div className="mt-2 flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="font-heading text-base font-bold">{recomendacao.item.nome}</p>
-                      <p className="mt-1 text-sm leading-relaxed text-text-secondary">{recomendacao.motivo}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <Preco
-                        valor={precoServico(recomendacao.item, categoriaVeiculo) ?? 0}
-                        className="text-lg text-text-primary"
-                      />
-                      {recomendacao.item.duracaoMin ? (
-                        <p className={`mt-0.5 ${rotuloBloco}`}>+ {formatarDuracao(recomendacao.item.duracaoMin)}</p>
-                      ) : null}
-                    </div>
-                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gold">Complete seu cuidado</p>
+                  <p className="mt-2 text-[15px] leading-relaxed text-text-primary">
+                    Por mais{" "}
+                    <Preco valor={pitstop.preco(recomendacao.item) ?? 0} className="text-lg text-gold" />,{" "}
+                    {(recomendacao.item.chamada ?? recomendacao.motivo).replace(/^./, (c) => c.toLowerCase())}.
+                  </p>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    {recomendacao.item.nome}
+                    {recomendacao.item.duracaoMin ? ` · + ${formatarDuracao(recomendacao.item.duracaoMin)}` : ""}
+                  </p>
                   <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
                     <button
                       type="button"
@@ -652,24 +593,16 @@ export default function BookingFlow() {
                         alternarAvulso(recomendacao.item);
                         setRecomendacaoEncerrada(true);
                       }}
-                      className="rounded-sm border border-gold px-5 py-2.5 font-heading text-sm font-semibold tracking-wide text-gold transition hover:bg-gold hover:text-asphalt"
+                      className="min-h-11 rounded-sm border border-gold px-5 text-sm font-bold tracking-wide text-gold transition hover:bg-gold hover:text-asphalt"
                     >
-                      Adicionar
+                      + Adicionar
                     </button>
                     <button
                       type="button"
                       onClick={() => setRecomendacaoEncerrada(true)}
-                      className="py-2 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
+                      className="min-h-11 text-sm text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
                     >
                       Agora não
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFichaAdicional(recomendacao.item)}
-                      aria-haspopup="dialog"
-                      className="py-2 font-mono text-xs uppercase tracking-widest text-text-secondary underline-offset-4 hover:text-gold hover:underline sm:ml-auto"
-                    >
-                      Ver o que inclui
                     </button>
                   </div>
                 </aside>
@@ -684,7 +617,7 @@ export default function BookingFlow() {
                   {adicionaisDisponiveis.length > 0 ? "Editar" : "Voltar"}
                 </button>
                 <button type="button" onClick={() => setEtapa("horario")} className={botaoPrincipal}>
-                  Escolher data e horário
+                  Escolher dia e horário
                 </button>
               </div>
             </div>
@@ -854,17 +787,45 @@ export default function BookingFlow() {
 
           {etapa === "horario" && (
             <div>
-              <h3 className="font-heading text-xl font-bold">Quando você quer vir?</h3>
-              <p className="mt-1 text-sm text-text-secondary">{resumoDoAtendimento}</p>
-              <p className="mb-6 mt-1 text-sm text-text-secondary">
-                {porteNome}
-                {duracaoMin != null && (
-                  <>
-                    {" "}
-                    · duração estimada <span className="text-text-primary">{formatarDuracao(duracaoMin)}</span>. Só
-                    aparecem livres os horários que comportam o atendimento inteiro.
-                  </>
-                )}
+              {ehAssinatura ? (
+                <p className="mb-5 text-sm text-text-secondary">
+                  {resumoDoAtendimento} · {porteNome}
+                </p>
+              ) : (
+                <div className="mb-6 flex items-center justify-between gap-4 rounded-md border border-gold/40 bg-gold/[0.06] px-4 py-3.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gold">Seu Pitstop</p>
+                    <p className="mt-1 font-heading text-lg font-bold leading-tight">
+                      {base?.nome}
+                      {avulsosSelecionados.length > 0 &&
+                        ` + ${avulsosSelecionados.length} cuidado${avulsosSelecionados.length > 1 ? "s" : ""}`}
+                    </p>
+                    <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-sm text-text-secondary">
+                      <span key={totalAvulso} className="valor-atualiza">
+                        <Preco valor={totalAvulso} className="text-base text-text-primary" />
+                      </span>
+                      <span>· {porteNome}</span>
+                      {duracaoMin != null && <span>· {formatarDuracao(duracaoMin)} estimado</span>}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErro(null);
+                      setEtapa(adicionaisDisponiveis.length > 0 ? "adicionais" : "veiculo");
+                    }}
+                    className="min-h-11 shrink-0 px-1 text-sm font-semibold text-gold underline underline-offset-4"
+                  >
+                    Alterar
+                  </button>
+                </div>
+              )}
+
+              <h3 className="font-heading text-2xl font-bold">Quando você quer vir?</h3>
+              <p className="mb-5 mt-1 text-sm text-text-secondary">
+                {duracaoMin != null
+                  ? "Só aparecem livres os horários que comportam o atendimento inteiro."
+                  : "Escolha o dia e o horário."}
               </p>
 
               {erro && <p role="alert" className="mb-4 text-sm text-red-400">{erro}</p>}
@@ -974,9 +935,12 @@ export default function BookingFlow() {
                     />
                   </label>
                   <label className="block">
-                    <span className="mb-1 block text-xs text-text-secondary">Placa (opcional)</span>
+                    <span className="mb-1 flex items-baseline justify-between text-xs text-text-secondary">
+                      Placa do veículo <span>Opcional</span>
+                    </span>
                     <input
-                      className="campo"
+                      className="campo font-mono uppercase"
+                      maxLength={8}
                       value={placa}
                       onChange={(e) => setPlaca(e.target.value.toUpperCase())}
                       placeholder="ABC1D23"
@@ -1046,7 +1010,7 @@ export default function BookingFlow() {
                     </div>
 
                     <p className="mx-auto mt-4 max-w-sm text-xs leading-relaxed text-text-secondary">
-                      Na chegada, apresente o QR. A recepção confere a placa do veículo antes do check-in.
+                      Na chegada, apresente o QR na recepção.
                     </p>
 
                     {!ehAssinatura && adicionaisAvaliacao.length > 0 && (
@@ -1105,48 +1069,6 @@ export default function BookingFlow() {
           )}
           </div>
         </div>
-
-        {/* ficha técnica de um adicional (etapa de adicionais e recomendação) */}
-        <FichaTecnicaSheet
-          ficha={fichaAdicional}
-          etiqueta={fichaAdicional?.categoria ? `Adicional · ${categoriasCuidado[fichaAdicional.categoria]}` : "Adicional"}
-          onFechar={() => setFichaAdicional(null)}
-          valor={
-            fichaAdicional && (
-              <>
-                <span className={rotuloBloco}>
-                  Valor{fichaAdicional.duracaoMin ? ` · + ${formatarDuracao(fichaAdicional.duracaoMin)}` : ""}
-                </span>
-                {precoServico(fichaAdicional, categoriaVeiculo) != null ? (
-                  <Preco valor={precoServico(fichaAdicional, categoriaVeiculo) ?? 0} className="text-2xl text-gold" />
-                ) : (
-                  <span className="font-heading text-sm font-bold tracking-[0.14em] text-gold">Mediante avaliação</span>
-                )}
-              </>
-            )
-          }
-          acao={
-            fichaAdicional && (
-              <button
-                type="button"
-                onClick={() => {
-                  alternarAvulso(fichaAdicional);
-                  if (recomendacao?.item.id === fichaAdicional.id) setRecomendacaoEncerrada(true);
-                  setFichaAdicional(null);
-                }}
-                className={`w-full rounded-sm py-4 font-heading text-sm font-bold tracking-[0.12em] transition ${
-                  avulsosSelecionados.some((s) => s.id === fichaAdicional.id)
-                    ? "border border-white/20 text-text-primary hover:border-gold hover:text-gold"
-                    : "bg-gold text-asphalt hover:brightness-110"
-                }`}
-              >
-                {avulsosSelecionados.some((s) => s.id === fichaAdicional.id)
-                  ? "Remover do meu Pitstop"
-                  : "Adicionar ao meu Pitstop"}
-              </button>
-            )
-          }
-        />
 
         {/* ficha técnica do benefício: o assinante relembra a diferença antes de agendar */}
         <FichaTecnicaSheet
@@ -1213,47 +1135,6 @@ function SpecItem({ label, valor, wide }: { label: string; valor: string; wide?:
   );
 }
 
-/** Linha do "Seu Pitstop": serviço, duração (só quando definida) e valor. */
-function LinhaResumo({
-  nome,
-  duracaoMin,
-  preco,
-  adicional = false,
-  onRemover,
-}: {
-  nome: string;
-  duracaoMin?: number;
-  preco: number | null;
-  adicional?: boolean;
-  onRemover?: () => void;
-}) {
-  return (
-    <li className="passo-entra flex items-start justify-between gap-4 py-3 text-sm">
-      <span className="min-w-0">
-        <span className={adicional ? "text-text-secondary" : "text-text-primary"}>{nome}</span>
-        <span className={`mt-0.5 flex items-center gap-3 ${rotuloBloco}`}>
-          {duracaoMin ? (
-            <span>
-              {adicional ? "+ " : ""}
-              {formatarDuracao(duracaoMin)}
-            </span>
-          ) : null}
-          {onRemover && (
-            <button type="button" onClick={onRemover} className="underline underline-offset-4 hover:text-gold">
-              Remover
-            </button>
-          )}
-        </span>
-      </span>
-      {preco != null ? (
-        <Preco valor={preco} className="text-base text-text-primary" />
-      ) : (
-        <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-gold">Avaliação solicitada</span>
-      )}
-    </li>
-  );
-}
-
 function OpcaoCadastro({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -1307,7 +1188,8 @@ function FormCadastro({
   onVoltar: () => void;
   onEnviar: () => void;
 }) {
-  const completo = nome.trim().length > 1 && carro.trim().length > 1 && placa.trim().length >= 7 && categoria && planoId;
+  // mínimo pra criar o cadastro: nome, veículo e plano. Placa é opcional.
+  const completo = nome.trim().length > 1 && carro.trim().length > 1 && categoria && planoId;
   const ehMoto = categoria === "MOTO";
 
   return (
@@ -1370,16 +1252,17 @@ function FormCadastro({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs text-text-secondary">Placa *</span>
+            <span className="mb-1 flex items-baseline justify-between text-xs text-text-secondary">
+              Placa do veículo <span>Opcional</span>
+            </span>
             <input
-              required
               className="campo font-mono uppercase"
               value={placa}
               onChange={(e) => setPlaca(e.target.value.toUpperCase())}
               placeholder="ABC1D23"
               maxLength={8}
             />
-            <span className="mt-1 block text-xs text-text-secondary">A recepção confere a placa na chegada.</span>
+            <span className="mt-1 block text-xs text-text-secondary">Se informar, a recepção usa para conferir o veículo na chegada.</span>
           </label>
         </div>
 

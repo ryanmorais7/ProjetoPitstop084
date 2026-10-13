@@ -272,19 +272,51 @@ export interface RecomendacaoAdicional {
   motivo: string;
 }
 
+/** Quantos adicionais aparecem em destaque antes do "Ver mais cuidados". */
+export const QTD_DESTAQUES = 3;
+
+const ordemDe = (item: ItemCatalogo) => item.ordemDestaque ?? (item.destaque ? 100 : 1000);
+
+/**
+ * Adicionais em destaque do configurador, pela prioridade do catálogo (`ordemDestaque`).
+ * Recebe os adicionais já filtrados pro veículo; devolve { destaques, outros } sem repetir item.
+ */
+export function separarDestaques(adicionais: ItemCatalogo[]): { destaques: ItemCatalogo[]; outros: ItemCatalogo[] } {
+  const ordenados = [...adicionais].sort((a, b) => ordemDe(a) - ordemDe(b));
+  // serviço mediante avaliação não tem "Por mais R$ X": não ocupa vaga de destaque
+  const destaques = ordenados.filter((a) => !a.requiresEvaluation).slice(0, QTD_DESTAQUES);
+  return { destaques, outros: adicionais.filter((a) => !destaques.includes(a)) };
+}
+
 /**
  * Devolve no máximo UM complemento pro que já foi escolhido, ou null. `candidatos` = adicionais
  * que o cliente pode contratar pra aquele veículo (já filtrados por ativo/preço/compatibilidade);
  * serviço mediante avaliação nunca é sugerido.
  */
 export function recomendarAdicional(idsEscolhidos: string[], candidatos: ItemCatalogo[]): RecomendacaoAdicional | null {
-  for (const regra of regrasRecomendacao) {
-    if (!idsEscolhidos.includes(regra.quando) || idsEscolhidos.includes(regra.sugerir)) continue;
-    const item = candidatos.find((c) => c.id === regra.sugerir && !c.requiresEvaluation);
-    if (item) return { item, motivo: regra.motivo };
-  }
-  return null;
+  return recomendarAdicionais(idsEscolhidos, candidatos)[0] ?? null;
 }
 
-/** Mesmo que `recomendarAdicional` (nome usado no alinhamento com a gestão). */
+/**
+ * Todas as recomendações elegíveis, em ordem: primeiro as regras de combinação acima, depois os
+ * demais adicionais pela prioridade de destaque do catálogo. Nunca inclui o que já foi escolhido
+ * nem serviço mediante avaliação. `candidatos` já vem filtrado por veículo, porte (preço), e ativo.
+ */
+export function recomendarAdicionais(idsEscolhidos: string[], candidatos: ItemCatalogo[]): RecomendacaoAdicional[] {
+  const elegiveis = candidatos.filter((c) => !c.requiresEvaluation && !idsEscolhidos.includes(c.id));
+  const lista: RecomendacaoAdicional[] = [];
+  for (const regra of regrasRecomendacao) {
+    if (!idsEscolhidos.includes(regra.quando)) continue;
+    const item = elegiveis.find((c) => c.id === regra.sugerir);
+    if (item && !lista.some((r) => r.item.id === item.id)) lista.push({ item, motivo: regra.motivo });
+  }
+  for (const item of [...elegiveis].sort((a, b) => ordemDe(a) - ordemDe(b))) {
+    if (item.ordemDestaque == null || lista.some((r) => r.item.id === item.id)) continue;
+    lista.push({ item, motivo: item.shortDescription ?? "" });
+  }
+  return lista;
+}
+
+/** Nomes usados no alinhamento com a gestão. */
 export const getRecommendedAddOn = recomendarAdicional;
+export const getRecommendedAddOns = recomendarAdicionais;

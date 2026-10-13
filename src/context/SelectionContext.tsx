@@ -1,8 +1,18 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { CategoriaVeiculo, PlanoId, Servico, TipoVeiculo, VehicleSize } from "@/lib/data";
-import { Catalogo, catalogoPadrao, motoDisponivelNoSite } from "@/lib/catalogo";
+import { createContext, useContext, useMemo, useState, useEffect, ReactNode } from "react";
+import { CategoriaVeiculo, PlanoId, precoServico, rotuloCategoriaVeiculo, Servico, TipoVeiculo, VehicleSize } from "@/lib/data";
+import {
+  adicionaisPara,
+  Catalogo,
+  catalogoPadrao,
+  duracaoTotal,
+  ItemCatalogo,
+  motoDisponivelNoSite,
+  recomendarAdicionais,
+  separarDestaques,
+  servicoBase,
+} from "@/lib/catalogo";
 
 export type TipoAtendimento = "avulso" | "assinatura";
 
@@ -29,6 +39,12 @@ interface SelectionContextValue {
   /** Cuidados adicionais escolhidos (a Ducha é sempre a base implícita, nunca entra aqui). */
   avulsosSelecionados: Servico[];
   alternarAvulso: (servico: Servico) => void;
+  /**
+   * "Agendar" do configurador da landing: o Pitstop já está montado (porte + adicionais), então
+   * o agendamento vai direto pra data e horário. O número muda a cada clique.
+   */
+  agendarPitstop: () => void;
+  pedidoDeAgendar: number;
   reiniciarSelecao: () => void;
 }
 
@@ -42,6 +58,7 @@ export function SelectionProvider({ children, catalogo = catalogoPadrao }: { chi
   const [tipoVeiculo, setTipoVeiculo] = useState<TipoVeiculo>("carro");
   const [porteDefinidoPeloUsuario, setPorteDefinidoPeloUsuario] = useState(false);
   const [avulsosSelecionados, setAvulsosSelecionados] = useState<Servico[]>([]);
+  const [pedidoDeAgendar, setPedidoDeAgendar] = useState(0);
 
   useEffect(() => {
     try {
@@ -89,6 +106,16 @@ export function SelectionProvider({ children, catalogo = catalogoPadrao }: { chi
     lembrar("MOTO");
   }
 
+  function agendarPitstop() {
+    // o porte mostrado no configurador (P por padrão) passa a valer como escolha do cliente
+    if (!porteDefinidoPeloUsuario) {
+      setPorteDefinidoPeloUsuario(true);
+      lembrar(tipoVeiculo === "moto" ? "MOTO" : porteVeiculo);
+    }
+    setTipoAtendimento("avulso");
+    setPedidoDeAgendar((n) => n + 1);
+  }
+
   function alternarAvulso(servico: Servico) {
     setAvulsosSelecionados((atual) =>
       atual.some((s) => s.id === servico.id)
@@ -114,6 +141,8 @@ export function SelectionProvider({ children, catalogo = catalogoPadrao }: { chi
         porteDefinidoPeloUsuario,
         avulsosSelecionados,
         alternarAvulso,
+        agendarPitstop,
+        pedidoDeAgendar,
         reiniciarSelecao: () => {
           setTipoAtendimento(null);
           setPlanoSelecionado(null);
@@ -124,6 +153,46 @@ export function SelectionProvider({ children, catalogo = catalogoPadrao }: { chi
       {children}
     </SelectionContext.Provider>
   );
+}
+
+/**
+ * O Pitstop montado (Ducha + adicionais) com tudo que se calcula a partir dele. É a ÚNICA conta
+ * de preço, duração e recomendação do site: landing, barra fixa do celular, agendamento e resumo
+ * leem daqui, sempre com o porte atual. Trocar o porte recalcula tudo na hora.
+ */
+export function usePitstop() {
+  const { catalogo, categoriaVeiculo, avulsosSelecionados } = useSelection();
+
+  return useMemo(() => {
+    const preco = (servico: Servico) => precoServico(servico, categoriaVeiculo);
+    const base = servicoBase(catalogo, categoriaVeiculo);
+    const disponiveis = adicionaisPara(catalogo, categoriaVeiculo, true);
+    // a seleção guarda só "o que o cliente escolheu"; os dados vêm sempre do catálogo vigente
+    const adicionais = avulsosSelecionados
+      .map((s) => disponiveis.find((d) => d.id === s.id))
+      .filter((s): s is ItemCatalogo => Boolean(s));
+    const ids = adicionais.map((s) => s.id);
+    const precoBase = base ? (preco(base) ?? 0) : 0;
+
+    return {
+      categoriaVeiculo,
+      porteNome: rotuloCategoriaVeiculo(categoriaVeiculo),
+      base,
+      precoBase,
+      disponiveis,
+      ...separarDestaques(disponiveis),
+      adicionais,
+      selecionado: (servico: Servico) => ids.includes(servico.id),
+      preco,
+      /** Pediram avaliação: sem valor no total. */
+      emAvaliacao: adicionais.filter((s) => s.requiresEvaluation),
+      total: precoBase + adicionais.reduce((soma, s) => soma + (preco(s) ?? 0), 0),
+      /** Soma das durações configuradas; null se algum serviço ainda não tem duração. */
+      duracaoMin: base ? duracaoTotal([base, ...adicionais]) : null,
+      /** Ofertas elegíveis, em ordem de prioridade (nunca o que já foi escolhido). */
+      recomendacoes: base ? recomendarAdicionais([base.id, ...ids], disponiveis) : [],
+    };
+  }, [catalogo, categoriaVeiculo, avulsosSelecionados]);
 }
 
 export function useSelection() {

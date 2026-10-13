@@ -670,3 +670,9 @@ body {
     padding: 0 !important;
   }
 }
+
+/* Foco por teclado visível em todo o site público (o admin tem o seu, acima). */
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}

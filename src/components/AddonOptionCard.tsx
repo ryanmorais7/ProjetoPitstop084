@@ -5,85 +5,110 @@ import { formatarDuracao } from "@/lib/catalogo";
 import Preco from "./Preco";
 
 /**
- * Card compacto de um adicional: nome, uma descrição curta e o preço. O corpo abre a ficha
- * técnica; o marcador no canto adiciona/remove direto, sem precisar abrir nada.
+ * Card de um adicional. Duas formas, mesma estrutura:
+ * - normal: nome, descrição curta, preço, "Ver o que inclui" e "+ Adicionar";
+ * - destaque: os primeiros do configurador, com a oferta "Por mais R$ X" e o benefício do serviço.
+ * O preço recebido é sempre o do porte atual. Selecionado = borda, fundo, selo e "✓ Adicionado"
+ * (o estado não depende só da cor).
  */
 export default function AddonOptionCard({
   servico,
   preco,
   selecionado,
+  destaque = false,
+  selo,
+  className = "",
   onToggle,
   onDetalhes,
 }: {
   servico: Servico;
+  /** null = mediante avaliação (nunca vira "Por mais R$ 0"). */
   preco: number | null;
   selecionado: boolean;
+  destaque?: boolean;
+  /** Etiqueta pequena acima do nome ("Recomendado"). */
+  selo?: string;
+  className?: string;
   onToggle: () => void;
   onDetalhes: () => void;
 }) {
-  return (
-    <div
-      className={`relative rounded-sm border transition-colors duration-200 ease-out ${
-        selecionado ? "border-gold bg-gold/[0.07]" : "border-white/10 bg-asphalt hover:border-white/25"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onDetalhes}
-        aria-haspopup="dialog"
-        className="flex h-full w-full flex-col p-4 text-left"
-      >
-        <span
-          className={`block pr-9 font-heading text-[15px] font-bold leading-tight transition-colors duration-200 ${
-            selecionado ? "text-gold" : "text-text-primary"
-          }`}
-        >
-          {servico.nome}
-        </span>
-        {servico.shortDescription && (
-          <span className="mt-2 line-clamp-2 block text-[13px] leading-snug text-text-secondary">
-            {servico.shortDescription}
-          </span>
-        )}
-        {/* duração só aparece quando a operação já definiu o tempo do serviço */}
-        {servico.duracaoMin ? (
-          <span className="mt-2 block font-mono text-[10px] uppercase tracking-widest text-text-secondary">
-            + {formatarDuracao(servico.duracaoMin)}
-          </span>
-        ) : null}
-        <span className="mt-auto flex items-end justify-between gap-3 pt-4">
-          <span key={`${servico.id}-${preco ?? "avaliacao"}`} className="preco-fade">
-            {preco != null ? (
-              <Preco valor={preco} className="text-xl text-text-primary" />
-            ) : (
-              <span className="font-mono text-[10px] uppercase tracking-widest text-gold">
-                {selecionado ? "Avaliação solicitada" : "Mediante avaliação"}
-              </span>
-            )}
-          </span>
-          <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-widest text-text-secondary underline decoration-white/20 underline-offset-4">
-            Ver o que inclui
-          </span>
-        </span>
-      </button>
+  const avaliacao = preco == null;
+  const rotuloAcao = selecionado
+    ? avaliacao
+      ? "✓ Avaliação solicitada"
+      : "✓ Adicionado"
+    : avaliacao
+    ? "Solicitar avaliação"
+    : "+ Adicionar";
 
-      {/* marcador: vira check dourado ao adicionar, volta a "+" ao remover. Área de toque de 44px. */}
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-pressed={selecionado}
-        aria-label={`${selecionado ? "Remover" : "Adicionar"} ${servico.nome}`}
-        className="absolute right-0.5 top-0.5 flex h-11 w-11 items-center justify-center"
-      >
-        <span
-          aria-hidden="true"
-          className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold transition-colors duration-200 ${
-            selecionado ? "border-gold bg-gold text-asphalt" : "border-white/25 text-text-secondary"
+  return (
+    <article
+      className={`flex flex-col rounded-md border p-4 transition-colors duration-200 ease-out sm:p-5 ${
+        selecionado
+          ? "border-gold bg-gold/[0.08]"
+          : destaque
+          ? "border-gold/30 bg-[#1b1915] hover:border-gold/60"
+          : "border-white/10 bg-asphalt hover:border-white/25"
+      } ${className}`}
+    >
+      {selo && !selecionado && (
+        <p className="mb-2 w-fit rounded-sm bg-gold/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gold">
+          {selo}
+        </p>
+      )}
+      {selecionado && (
+        <p className="check-entra mb-2 w-fit rounded-sm bg-gold px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-asphalt">
+          ✓ No seu Pitstop
+        </p>
+      )}
+
+      <h4 className="font-heading text-lg font-bold leading-tight text-text-primary">{servico.nome}</h4>
+      <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-text-secondary">
+        {destaque && servico.chamada ? `${servico.chamada}.` : servico.shortDescription}
+      </p>
+
+      <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+        <div key={`${servico.id}-${preco ?? "avaliacao"}`} className="preco-fade">
+          {avaliacao ? (
+            <p className="text-sm font-semibold text-gold">Mediante avaliação</p>
+          ) : (
+            <>
+              {destaque && <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Por mais</p>}
+              <Preco valor={preco} className={`mt-0.5 ${destaque ? "text-3xl" : "text-2xl"} text-text-primary`} />
+            </>
+          )}
+        </div>
+        {/* tempo extra: informação secundária, só quando a duração do serviço já foi definida */}
+        {servico.duracaoMin ? (
+          <p className="text-xs text-text-secondary">+ {formatarDuracao(servico.duracaoMin)}</p>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={selecionado}
+          aria-label={`${selecionado ? "Remover" : avaliacao ? "Solicitar avaliação de" : "Adicionar"} ${servico.nome}`}
+          className={`min-h-11 flex-1 whitespace-nowrap rounded-sm px-4 text-sm font-bold tracking-wide transition-colors duration-200 ${
+            selecionado
+              ? "border border-gold bg-transparent text-gold"
+              : destaque
+              ? "bg-gold text-asphalt hover:brightness-110"
+              : "border border-white/25 text-text-primary hover:border-gold hover:text-gold"
           }`}
         >
-          {selecionado ? <span className="check-entra">✓</span> : "+"}
-        </span>
-      </button>
-    </div>
+          {rotuloAcao}
+        </button>
+        <button
+          type="button"
+          onClick={onDetalhes}
+          aria-haspopup="dialog"
+          className="min-h-11 whitespace-nowrap text-sm text-text-secondary underline decoration-white/25 underline-offset-4 transition-colors hover:text-gold"
+        >
+          Ver o que inclui
+        </button>
+      </div>
+    </article>
   );
 }

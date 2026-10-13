@@ -128,8 +128,6 @@ export type ResultadoCadastroAssinante =
   | { ok: true; assinante: AssinanteEncontrado; jaExistia: boolean }
   | { ok: false; erro: string };
 
-const PLACA = /^[A-Z]{3}\d[A-Z0-9]\d{2}$/;
-
 /**
  * Cadastro PitPass, feito uma única vez. Reaproveita o cliente que já existir com esse WhatsApp
  * (nunca duplica) e o veículo igual que ele já tiver. O plano entra como "pendente": o cliente
@@ -148,15 +146,15 @@ export async function cadastrarAssinante(corpo: unknown, catalogo: Catalogo): Pr
   if (typeof nome !== "string" || nome.trim().length < 2) return { ok: false, erro: "Informe seu nome." };
   if (typeof modelo !== "string" || modelo.trim().length < 2) return { ok: false, erro: "Informe o modelo do veículo." };
   if (!categoriaVeiculoValida(categoria)) return { ok: false, erro: "Escolha o tipo de veículo." };
-  const placaLimpa = typeof placa === "string" ? placa.toUpperCase().replace(/[^A-Z0-9]/g, "") : "";
-  if (!PLACA.test(placaLimpa)) return { ok: false, erro: "Confira a placa do veículo." };
+  // placa é opcional em todo o fluxo público: sem ela o cadastro segue, e o admin completa depois
+  const placaLimpa = typeof placa === "string" ? placa.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) : "";
 
   const { cliente } = await buscarOuCriarCliente({
     nome,
     telefone: formatarTelefone(digitos),
     origem: "site",
   });
-  const veiculo = await buscarOuCriarVeiculo({ clienteId: cliente.id, modelo, placa: placaLimpa, porte: categoria });
+  const veiculo = await buscarOuCriarVeiculo({ clienteId: cliente.id, modelo, placa: placaLimpa || null, porte: categoria });
 
   let assinatura = await buscarAssinaturaVigente(cliente.id);
   if (assinatura) {

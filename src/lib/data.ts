@@ -253,6 +253,16 @@ export interface Servico extends FichaTecnica {
   tiposVeiculo?: TipoVeiculo[];
   requiresEvaluation: boolean;
   destaque?: boolean;
+  /**
+   * Posição entre os adicionais em destaque do configurador (1 = primeiro). Os três primeiros
+   * aparecem antes do "Ver mais cuidados". Fonte única: trocar aqui muda landing e agendamento.
+   */
+  ordemDestaque?: number;
+  /**
+   * Benefício em uma frase, pra oferta "Por mais R$ X": o que o cliente ganha, não o nome do
+   * serviço. Só pode repetir o que a ficha técnica (resultado esperado) já afirma.
+   */
+  chamada?: string;
   /** Serviço técnico: precisa do detailer (o Kanban manda pro fluxo EM DETAIL). */
   exigeDetailer?: boolean;
   /** Precisa do lavador. Ausente = sim, a não ser que seja serviço só do detailer. */
@@ -342,6 +352,8 @@ export const servicosAvulsos: Servico[] = [
     precos: { P: 99.9, G: 149.9 },
     requiresEvaluation: false,
     destaque: true,
+    ordemDestaque: 2,
+    chamada: "Deixe a pintura lisa e pronta para receber proteção",
   },
   {
     id: "higienizacao-interna",
@@ -370,6 +382,8 @@ export const servicosAvulsos: Servico[] = [
     precos: { P: 249.9, G: 299.9 },
     requiresEvaluation: false,
     destaque: true,
+    ordemDestaque: 3,
+    chamada: "Renove e higienize o interior do seu carro",
   },
   {
     id: "protecao-pintura-selante",
@@ -383,6 +397,8 @@ export const servicosAvulsos: Servico[] = [
     precos: { P: 49.9, G: 79.9 },
     requiresEvaluation: false,
     destaque: true,
+    ordemDestaque: 1,
+    chamada: "Garanta mais brilho e proteção para a pintura",
   },
   {
     id: "descontaminacao-protecao-motor",
