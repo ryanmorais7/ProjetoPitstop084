@@ -135,35 +135,46 @@ export const planos: Record<PlanoId, Plano> = {
     cta: "Quero ser Diamante",
     badge: "Experiência completa",
   },
-  // Planos de moto: só dois nesta fase (sem Moto Diamante). Mensalidade e cotas ainda dependem
-  // da gestão: enquanto `precoMoto` for null, o plano não aparece no site.
+  // Planos de moto: só dois nesta fase (sem Moto Diamante). A mensalidade ainda não foi
+  // definida: com `precoMoto` null o card aparece com "Valor sob consulta" e o botão chama no
+  // WhatsApp. Definir em Admin > Serviços > Planos PitPass (ou aqui, no código).
   "moto-black": {
     id: "moto-black",
     nome: "Moto Black",
     nivel: 1,
-    headline: "Manutenção essencial para manter a moto limpa e bem apresentada.",
+    headline: "O cuidado essencial para manter sua moto limpa e bem apresentada durante o mês.",
     tipoVeiculo: "moto",
     precos: null,
     precoMoto: null,
-    beneficios: ["2 lavagens mensais"],
+    beneficios: [
+      "2 lavagens por mês",
+      "Lavagem externa: tanque, carenagens, rodas, paralamas e banco",
+      "Áreas externas acessíveis, sem desmontagem",
+      "Secagem detalhada",
+      "Acabamento dos plásticos compatíveis",
+    ],
     cta: "Quero ser Moto Black",
-    aConfirmar: ["Mensalidade", "Quantidade de lavagens por ciclo (proposta: 2 por mês)"],
+    aConfirmar: ["Mensalidade"],
   },
   "moto-gold": {
     id: "moto-gold",
     nome: "Moto Gold",
     nivel: 2,
-    headline: "Limpeza com proteção adicional para preservar pintura, carenagens e acabamento da moto.",
+    headline:
+      "Cuidado frequente com produtos de nível superior e proteção adicional para pintura, carenagens e acabamentos compatíveis.",
     tipoVeiculo: "moto",
     precos: null,
     precoMoto: null,
-    beneficios: ["1 lavagem semanal"],
-    cta: "Quero ser Moto Gold",
-    aConfirmar: [
-      "Mensalidade",
-      "Frequência (proposta: 1 lavagem por semana)",
-      "Se inclui atendimento prioritário e desconto em adicionais de moto",
+    beneficios: [
+      "1 lavagem por semana",
+      "Tudo do Moto Black, com produtos de nível superior",
+      "Proteção de pintura e carenagens compatíveis",
+      "Cuidado superior das rodas e melhor acabamento dos plásticos",
+      "Atendimento prioritário",
+      "Desconto em adicionais de moto",
     ],
+    cta: "Quero ser Moto Gold",
+    aConfirmar: ["Mensalidade", "Percentual do desconto em adicionais de moto", "Produtos de linha superior e de proteção usados"],
   },
 };
 
@@ -200,10 +211,10 @@ export const regrasBeneficios: Record<
     "Manutenção": { tipo: "semanal", limite: null }, // "Manutenção semanal ilimitada"
   },
   "moto-black": {
-    "Lavagem Moto Black": { tipo: "ciclo", limite: 2 }, // "2 lavagens mensais" (proposta a validar)
+    "Lavagem Moto Black": { tipo: "ciclo", limite: 2 }, // "2 lavagens por mês"
   },
   "moto-gold": {
-    "Lavagem Moto Gold": { tipo: "semanal", limite: 1 }, // "1 lavagem semanal" (proposta a validar)
+    "Lavagem Moto Gold": { tipo: "semanal", limite: 1 }, // "1 lavagem por semana"
   },
 };
 
@@ -290,13 +301,13 @@ export const duchaPitstop: Servico = {
   duracao: "Aproximadamente 45 minutos",
   duracaoMin: 45,
   expectedResult: "Veículo limpo, seco e com pneus renovados.",
-  precos: { P: 49.9, G: 49.9 },
+  precos: { P: 49.9, G: 59.9 },
   requiresEvaluation: false,
 };
 
 /**
- * Ducha Moto: serviço base do atendimento de motocicleta. Preço e duração NÃO estão definidos:
- * a gestão informa em Admin > Serviços, e só então a moto aparece no agendamento do site.
+ * Ducha Moto: serviço base do atendimento de motocicleta. Moto não tem porte: um preço só.
+ * A duração ainda não foi definida (Admin > Serviços).
  *
  * SEGURANÇA: moto não recebe pretinho nem qualquer produto que deixe a banda de rodagem
  * escorregadia. Nunca copiar a etapa "Pretinho nos pneus" das lavagens de carro pra cá, nem
@@ -319,9 +330,9 @@ export const duchaMoto: Servico = {
   ],
   technicalNote:
     "Sem desmontagem de peças. Não aplicamos pretinho nem produto que deixe a banda de rodagem dos pneus escorregadia: aderência vem antes do acabamento.",
-  aConfirmar: ["Preço", "Duração", "Etapas e produtos realmente usados em moto (lista atual é a direção técnica inicial)"],
+  aConfirmar: ["Duração", "Etapas e produtos realmente usados em moto (lista atual é a direção técnica inicial)"],
   precos: null,
-  precoMoto: null,
+  precoMoto: 39.9,
   tiposVeiculo: ["moto"],
   requiresEvaluation: false,
 };

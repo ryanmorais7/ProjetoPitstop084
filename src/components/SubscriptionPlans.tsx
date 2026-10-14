@@ -22,7 +22,7 @@ import FichaTecnicaSheet from "./FichaTecnicaSheet";
 export default function SubscriptionPlans() {
   const { catalogo, categoriaVeiculo: porteVeiculo, tipoVeiculo, selecionarPlano, setTipoAtendimento } = useSelection();
   const planos = catalogo.planos;
-  // planos do veículo escolhido, só os ativos e com mensalidade definida
+  // planos do veículo escolhido: carro = Black, Gold, Diamante; moto = Moto Black, Moto Gold
   const listaPlanos = planosPara(catalogo, tipoVeiculo, true);
   const ehMoto = tipoVeiculo === "moto";
   // versão muda a cada recomendação pra o realce rodar de novo mesmo se o plano for o mesmo
@@ -75,20 +75,24 @@ export default function SubscriptionPlans() {
           </Reveal>
         )}
 
-        {listaPlanos.length === 0 && (
-          <p className="mt-8 rounded-sm border border-white/10 bg-panel px-5 py-4 text-sm text-text-secondary">
-            Os planos para moto ainda estão sendo preparados. Por enquanto, agende a Ducha Moto avulsa.
-          </p>
-        )}
-
-        <div id="planos-grade" className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* 3 planos (carro) em 3 colunas; 2 planos (moto) lado a lado, centralizados */}
+        <div
+          id="planos-grade"
+          className={`mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 ${
+            listaPlanos.length === 3 ? "lg:grid-cols-3" : "mx-auto max-w-3xl"
+          }`}
+        >
           {listaPlanos.map((plano, i) => {
             const destacado = destaque?.id === plano.id;
             return (
               <Reveal
                 key={plano.id}
                 delayMs={i * 80}
-                className="sm:last:col-span-2 sm:last:mx-auto sm:last:max-w-sm lg:last:col-span-1 lg:last:mx-0 lg:last:max-w-none"
+                className={
+                  listaPlanos.length === 3
+                    ? "sm:last:col-span-2 sm:last:mx-auto sm:last:max-w-sm lg:last:col-span-1 lg:last:mx-0 lg:last:max-w-none"
+                    : undefined
+                }
               >
                 <PlanoCard
                   key={destacado ? `${plano.id}-${destaque.versao}` : plano.id}

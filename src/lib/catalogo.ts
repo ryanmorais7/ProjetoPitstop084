@@ -11,7 +11,6 @@ import {
   Plano,
   PlanoId,
   planos as planosBase,
-  precoPlano,
   precoServico,
   Servico,
   servicosAvulsos,
@@ -214,13 +213,13 @@ export function motoDisponivelNoSite(catalogo: Catalogo): boolean {
   return Boolean(base && disponivelNoSite(base, "MOTO"));
 }
 
-/** Planos de um tipo de veículo. `site` = só os ativos e com mensalidade definida. */
+/**
+ * Planos de um tipo de veículo (carro: Black, Gold, Diamante; moto: Moto Black, Moto Gold).
+ * `site` = só os ativos. Plano sem mensalidade definida continua aparecendo, com "Valor sob
+ * consulta" (ver PlanoCard): nunca com um preço inventado.
+ */
 export function planosPara(catalogo: Catalogo, tipo: TipoVeiculo, site: boolean): Plano[] {
-  return Object.values(catalogo.planos).filter((p) => {
-    if (p.tipoVeiculo !== tipo) return false;
-    if (!site) return true;
-    return p.ativo !== false && precoPlano(p, tipo === "moto" ? "MOTO" : "P") != null;
-  });
+  return Object.values(catalogo.planos).filter((p) => p.tipoVeiculo === tipo && (!site || p.ativo !== false));
 }
 
 /**

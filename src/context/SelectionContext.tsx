@@ -31,6 +31,8 @@ interface SelectionContextValue {
   porteVeiculo: VehicleSize;
   definirPorteVeiculo: (porte: VehicleSize) => void;
   tipoVeiculo: TipoVeiculo;
+  /** Escolhe "Carro": o porte (P/G) vem logo em seguida, no mesmo seletor. */
+  definirCarro: () => void;
   definirMoto: () => void;
   /** O que define preço, duração e serviços: porte do carro ou "MOTO". */
   categoriaVeiculo: CategoriaVeiculo;
@@ -100,6 +102,11 @@ export function SelectionProvider({ children, catalogo = catalogoPadrao }: { chi
     lembrar(porte);
   }
 
+  function definirCarro() {
+    trocarTipo("carro");
+    lembrar(porteVeiculo);
+  }
+
   function definirMoto() {
     trocarTipo("moto");
     setPorteDefinidoPeloUsuario(true);
@@ -136,6 +143,7 @@ export function SelectionProvider({ children, catalogo = catalogoPadrao }: { chi
         porteVeiculo,
         definirPorteVeiculo,
         tipoVeiculo,
+        definirCarro,
         definirMoto,
         categoriaVeiculo: tipoVeiculo === "moto" ? "MOTO" : porteVeiculo,
         porteDefinidoPeloUsuario,

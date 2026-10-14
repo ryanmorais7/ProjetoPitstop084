@@ -216,7 +216,7 @@ function CartaoPlano({ plano, catalogo }: { plano: Plano; catalogo: Catalogo }) 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <ClienteBadge nomePlano={plano.nome} />
         <span className={`adm-chip ${ativo && !semPreco ? "adm-status-concluido" : "adm-status-inativo"}`}>
-          {!ativo ? "Inativo" : semPreco ? "Sem mensalidade" : "Ativo"}
+          {!ativo ? "Inativo" : semPreco ? "Ativo · valor a definir" : "Ativo"}
         </span>
       </div>
 
@@ -235,7 +235,9 @@ function CartaoPlano({ plano, catalogo }: { plano: Plano; catalogo: Catalogo }) 
           Ativo no site
         </Marcar>
         {semPreco && (
-          <p className="text-xs text-adm-muted">Sem mensalidade definida, o plano não aparece para o cliente.</p>
+          <p className="text-xs text-adm-muted">
+            Sem mensalidade definida, o site mostra o plano com &quot;Valor sob consulta&quot; e o botão chama no WhatsApp.
+          </p>
         )}
         <BotaoEnviar>Salvar</BotaoEnviar>
       </FormComAviso>

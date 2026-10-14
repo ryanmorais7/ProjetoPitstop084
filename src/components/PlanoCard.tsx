@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CategoriaVeiculo, Plano, precoPlano } from "@/lib/data";
+import { CategoriaVeiculo, linkWhatsapp, Plano, precoPlano } from "@/lib/data";
 import { temaDoPlano } from "@/lib/pitpassTheme";
 import Bolt from "./Bolt";
 import NivelCuidado from "./NivelCuidado";
@@ -90,9 +90,14 @@ export default function PlanoCard({
 
       <p className={`mt-6 flex flex-wrap items-baseline gap-x-1.5 ${estilo.preco}`}>
         <span key={porteVeiculo} className="valor-atualiza">
-          {preco != null && <Preco valor={preco} className="text-4xl" />}
+          {preco != null ? (
+            <Preco valor={preco} className="text-4xl" />
+          ) : (
+            // mensalidade ainda não definida: nada de preço inventado nem card quebrado
+            <span className="font-heading text-2xl font-bold">Valor sob consulta</span>
+          )}
         </span>
-        <span className={`whitespace-nowrap font-mono text-xs ${textoSecundario}`}>/mês</span>
+        {preco != null && <span className={`whitespace-nowrap font-mono text-xs ${textoSecundario}`}>/mês</span>}
       </p>
       <p className={`mt-4 text-sm leading-relaxed ${textoSecundario}`}>{plano.headline}</p>
 
@@ -135,6 +140,18 @@ export default function PlanoCard({
           Ver o que inclui
         </button>
       )}
+      {preco == null ? (
+        <a
+          href={linkWhatsapp(`Olá! Quero saber o valor do plano ${plano.nome} da PitStop084.`)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center justify-center gap-1 rounded-sm py-3.5 font-heading text-xs font-bold uppercase tracking-[0.12em] transition ${
+            onVerInclui ? "" : "mt-auto"
+          } ${estilo.cta}`}
+        >
+          Consultar valor no WhatsApp
+        </a>
+      ) : (
       <button
         type="button"
         onClick={onClick}
@@ -144,6 +161,7 @@ export default function PlanoCard({
       >
         {plano.cta}
       </button>
+      )}
     </div>
   );
 }

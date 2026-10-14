@@ -16,17 +16,12 @@ function Marcador({ selecionado }: { selecionado: boolean }) {
   );
 }
 
-const classeOpcao = (selecionado: boolean) =>
-  `flex items-center justify-between gap-3 rounded-sm border px-5 py-3 text-left transition-colors duration-200 ${
-    selecionado ? "border-gold bg-gold/[0.07]" : "border-white/10 bg-asphalt hover:border-white/30"
-  }`;
-
 /**
  * Seletor de veículo. Lê e grava SEMPRE no SelectionContext (fonte única de verdade):
- * trocar aqui atualiza preços, configurador, planos, assistente, ficha técnica e agendamento.
+ * trocar aqui atualiza preços, configurador, planos, ficha técnica e agendamento.
  *
- * Carro escolhe o porte (P/G). Moto não tem porte: entra como opção própria, e só aparece
- * quando o atendimento de moto está liberado no catálogo (Ducha Moto ativa e com preço).
+ * Primeiro CARRO ou MOTO. Carro escolhe o porte (P/G) logo abaixo; moto não tem porte.
+ * Sem atendimento de moto ativo no catálogo, o seletor volta a ser só o porte do carro.
  */
 export function VehicleSizeSelector({
   className = "",
@@ -42,12 +37,20 @@ export function VehicleSizeSelector({
    * (o "P" padrão serve só pra mostrar preço na landing, não vale como resposta).
    */
   exigirEscolha?: boolean;
+  /** Chamado quando a escolha fica completa: porte do carro (P/G) ou "MOTO". */
   onEscolher?: (categoria: CategoriaVeiculo) => void;
 }) {
-  const { porteVeiculo, definirPorteVeiculo, tipoVeiculo, definirMoto, motoDisponivel, porteDefinidoPeloUsuario } =
-    useSelection();
+  const {
+    porteVeiculo,
+    definirPorteVeiculo,
+    tipoVeiculo,
+    definirCarro,
+    definirMoto,
+    motoDisponivel,
+    porteDefinidoPeloUsuario,
+  } = useSelection();
   const temSelecao = !exigirEscolha || porteDefinidoPeloUsuario;
-  const motoSelecionada = temSelecao && tipoVeiculo === "moto";
+  const ehMoto = motoDisponivel && tipoVeiculo === "moto";
 
   return (
     <div className={className}>
@@ -56,48 +59,65 @@ export function VehicleSizeSelector({
           {motoDisponivel ? "Qual é o seu veículo?" : "Qual é o seu tipo de veículo?"}
         </p>
       )}
-      <div className={`grid gap-3 ${motoDisponivel ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-        {listaPortesVeiculo.map((porte) => {
-          const selecionado = temSelecao && tipoVeiculo === "carro" && porteVeiculo === porte.id;
-          return (
-            <button
-              key={porte.id}
-              type="button"
-              onClick={() => {
-                definirPorteVeiculo(porte.id);
-                onEscolher?.(porte.id);
-              }}
-              aria-pressed={selecionado}
-              className={classeOpcao(selecionado)}
-            >
-              <span>
-                <span className="block font-heading text-sm font-bold">{porte.nome}</span>
-                <span className="block font-mono text-xs uppercase tracking-wide text-text-secondary">
-                  {motoDisponivel ? `Carro · ${porte.descricao}` : porte.descricao}
+
+      {motoDisponivel && (
+        <div role="group" aria-label="Tipo de veículo" className="mb-3 grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-asphalt p-1">
+          {(["carro", "moto"] as const).map((tipo) => {
+            const ativo = tipoVeiculo === tipo && (tipo === "carro" || temSelecao);
+            return (
+              <button
+                key={tipo}
+                type="button"
+                aria-pressed={ativo}
+                onClick={() => {
+                  if (tipo === "moto") {
+                    definirMoto();
+                    onEscolher?.("MOTO");
+                  } else {
+                    definirCarro();
+                  }
+                }}
+                className={`min-h-11 rounded-sm font-heading text-sm font-bold uppercase tracking-[0.14em] transition-colors duration-200 ${
+                  ativo ? "bg-gold text-asphalt" : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {tipo === "carro" ? "Carro" : "Moto"}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* porte só existe pra carro */}
+      {!ehMoto && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {listaPortesVeiculo.map((porte) => {
+            const selecionado = temSelecao && tipoVeiculo === "carro" && porteVeiculo === porte.id;
+            return (
+              <button
+                key={porte.id}
+                type="button"
+                onClick={() => {
+                  definirPorteVeiculo(porte.id);
+                  onEscolher?.(porte.id);
+                }}
+                aria-pressed={selecionado}
+                className={`flex items-center justify-between gap-3 rounded-sm border px-5 py-3 text-left transition-colors duration-200 ${
+                  selecionado ? "border-gold bg-gold/[0.07]" : "border-white/10 bg-asphalt hover:border-white/30"
+                }`}
+              >
+                <span>
+                  <span className="block font-heading text-sm font-bold">{porte.nome}</span>
+                  <span className="block font-mono text-xs uppercase tracking-wide text-text-secondary">
+                    {porte.descricao}
+                  </span>
                 </span>
-              </span>
-              <Marcador selecionado={selecionado} />
-            </button>
-          );
-        })}
-        {motoDisponivel && (
-          <button
-            type="button"
-            onClick={() => {
-              definirMoto();
-              onEscolher?.("MOTO");
-            }}
-            aria-pressed={motoSelecionada}
-            className={classeOpcao(motoSelecionada)}
-          >
-            <span>
-              <span className="block font-heading text-sm font-bold">Moto</span>
-              <span className="block font-mono text-xs uppercase tracking-wide text-text-secondary">Motocicleta</span>
-            </span>
-            <Marcador selecionado={motoSelecionada} />
-          </button>
-        )}
-      </div>
+                <Marcador selecionado={selecionado} />
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
