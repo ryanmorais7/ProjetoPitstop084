@@ -135,9 +135,9 @@ export const planos: Record<PlanoId, Plano> = {
     cta: "Quero ser Diamante",
     badge: "Experiência completa",
   },
-  // Planos de moto: só dois nesta fase (sem Moto Diamante). A mensalidade ainda não foi
-  // definida: com `precoMoto` null o card aparece com "Valor sob consulta" e o botão chama no
-  // WhatsApp. Definir em Admin > Serviços > Planos PitPass (ou aqui, no código).
+  // Planos de moto: só dois nesta fase (sem Moto Diamante). Moto não tem porte: mensalidade
+  // única em `precoMoto` (o admin pode ajustar em Serviços > Planos PitPass). Se um dia ficar
+  // null, o card mostra "Valor sob consulta" e chama no WhatsApp.
   "moto-black": {
     id: "moto-black",
     nome: "Moto Black",
@@ -145,7 +145,7 @@ export const planos: Record<PlanoId, Plano> = {
     headline: "O cuidado essencial para manter sua moto limpa e bem apresentada durante o mês.",
     tipoVeiculo: "moto",
     precos: null,
-    precoMoto: null,
+    precoMoto: 79.9,
     beneficios: [
       "2 lavagens por mês",
       "Lavagem externa: tanque, carenagens, rodas, paralamas e banco",
@@ -154,7 +154,6 @@ export const planos: Record<PlanoId, Plano> = {
       "Acabamento dos plásticos compatíveis",
     ],
     cta: "Quero ser Moto Black",
-    aConfirmar: ["Mensalidade"],
   },
   "moto-gold": {
     id: "moto-gold",
@@ -164,7 +163,7 @@ export const planos: Record<PlanoId, Plano> = {
       "Cuidado frequente com produtos de nível superior e proteção adicional para pintura, carenagens e acabamentos compatíveis.",
     tipoVeiculo: "moto",
     precos: null,
-    precoMoto: null,
+    precoMoto: 139.9,
     beneficios: [
       "1 lavagem por semana",
       "Tudo do Moto Black, com produtos de nível superior",
@@ -174,7 +173,7 @@ export const planos: Record<PlanoId, Plano> = {
       "Desconto em adicionais de moto",
     ],
     cta: "Quero ser Moto Gold",
-    aConfirmar: ["Mensalidade", "Percentual do desconto em adicionais de moto", "Produtos de linha superior e de proteção usados"],
+    aConfirmar: ["Percentual do desconto em adicionais de moto", "Produtos de linha superior e de proteção usados"],
   },
 };
 
